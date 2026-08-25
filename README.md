@@ -1,207 +1,384 @@
-<div align="center">
-  <img src="https://liang-tian.com/images/works/alter-emo/exhibition-board.png" alt="Alter Emo exhibition board" width="100%" />
-  <h1>Alter Emo — AI Mirror</h1>
-  <p><strong>A reflective AI experience built from narrative memory, emotion, and the user's own communication patterns.</strong></p>
-  <p><a href="https://liang-tian.com/works/aimirror">Full interactive case study →</a></p>
-</div>
+# Alter Emo AI Mirror
 
-## Overview
+Alter Emo is a local Godot + Flask + Python prototype for building a conversational "AI mirror" from an adaptive interview and a persistent narrative-memory store.
 
-Alter Emo explores what an AI companion could become when it does more than answer the current prompt. The project creates an evolving pixel-self from memories, daily narratives, feelings, choices, and ways of speaking that the user intentionally shares.
+This repository contains the runnable public implementation: a Godot 4 client, an HTTP bridge, interview ingestion, memory retrieval, response planning, mirror chat, event reflection, and offline tests. Private memories, recordings, credentials, generated caches, and third-party exhibition assets are not included.
 
-The goal is not to produce a perfect digital copy. It is to create a partial, transparent mirror that helps a person notice recurring patterns, revisit meaningful experiences, and make future choices with greater clarity.
+## Current status
 
-> This repository documents the product concept, interaction model, and agent architecture. Private user data and production credentials are not included.
+Verified on Windows with Python 3.10 and Godot 4.4:
 
-## The problem
+- clean virtual-environment installation from `requirements.txt`;
+- all 27 locked Python packages installed and `pip check` passed;
+- 16 offline tests passed;
+- Flask started locally and returned HTTP 200 from `/health`;
+- the Godot project and main scene loaded and started with Godot 4.4;
+- Godot successfully reached the local Flask health endpoint.
 
-Everyday experiences are fragmented across conversations, notes, emotions, and decisions. Conventional chat systems usually respond well to a single question, but rarely reconnect the long-term narrative: what repeatedly matters, how a person frames experience, and why similar choices return.
+Live GPT generation requires a valid `OPENAI_API_KEY`. The repository can be installed and tested without a key, but interview ingestion, mirror replies, embeddings, and event reflection call the OpenAI API.
 
-Alter Emo asks:
+## Architecture
 
-- How can an agent remember without reducing a person to a fixed profile?
-- How can raw life stories and structured memory work together?
-- How should a mirror-like agent choose when to ask, reframe, nudge, or simply reflect?
-- How can an embodied interface make long-term reflection feel present without pretending to be the real person?
-
-## Experience
-
-The user meets a pixel character inside a Godot room. Everyday chat, diary-like input, and adaptive interviews gradually build a mirror-self. The character can recall relevant narrative windows, identify emotional and behavioral patterns, plan an appropriate response action, and write the new exchange back into memory.
-
-The system is designed around user agency: the mirror grows only from material the user chooses to share.
-
-## System architecture
-
-```mermaid
-flowchart LR
-    A[Godot room / conversation / event] --> B[Flask bridge]
-    B --> C[Narrative parser]
-    C --> D[Memory index]
-    C --> E[Narrative store]
-    D --> F[Hybrid retrieval]
-    E --> F
-    F --> G[Reflection + planning]
-    G --> H[Behavior policy]
-    H --> I[Mirror reply]
-    I --> B
-    I --> D
-    I --> E
+```text
+Godot 4 client
+    │ HTTP/JSON
+    ▼
+Flask bridge (server/)
+    ├── session and interview state
+    ├── legacy EMO GYM compatibility routes
+    └── AlterEmoCoreAdapter
+            │
+            ▼
+Python agent core (src/)
+    ├── interview extraction
+    ├── structured memory + narrative windows
+    ├── semantic/emotional/salience/recency retrieval
+    ├── reflection and response policy
+    └── mirror response generation
 ```
 
-### 1. Conversation capture
+The default retrieval score uses four inspectable signals:
 
-Godot presents the room, avatar movement, dialogue, recording state, and embodied cues. Flask coordinates conversational input, daily notes, adaptive interview questions, generated replies, and file export.
+| Signal | Weight |
+| --- | ---: |
+| Semantic similarity | 0.55 |
+| Emotional similarity | 0.20 |
+| Salience | 0.15 |
+| Recency | 0.10 |
 
-### 2. Dual memory representation
+## Repository layout
 
-- **Structured memory nodes** support retrieval through event, topic, emotion, salience, and time.
-- **Narrative windows** retain the surrounding story, language, framing, and conversational context.
+```text
+alter-emo-ai-mirror/
+├── godot/                  # Godot 4 client and main scene
+│   ├── project.godot
+│   ├── Main.tscn
+│   └── scripts/
+├── server/                 # Flask application and core adapter
+│   ├── app.py
+│   ├── bridge.py
+│   └── core_adapter.py
+├── src/                    # Interview, memory, retrieval, and mirror core
+├── examples/               # Public interview and prompt pools
+├── tests/                  # Offline unit and integration tests
+├── .env.example            # Environment-variable template
+└── requirements.txt        # Complete locked Python dependency set
+```
 
-This keeps the system searchable without throwing away the user's original voice.
+The following runtime directories are generated locally and ignored by Git:
 
-### 3. Hybrid retrieval
+- `agents/` — persona metadata, interview sessions, memories, and embeddings;
+- `runtime/bridge_sessions/` — Flask bridge session snapshots;
+- `.godot/` — Godot import/editor cache;
+- `.venv/` — Python virtual environment.
 
-Candidate memories are ranked using four signals:
+## Requirements
 
-| Signal | Weight | Purpose |
-| --- | ---: | --- |
-| Semantic similarity | 55% | Finds experiences with related meaning |
-| Emotional similarity | 20% | Recovers a comparable affective state |
-| Salience | 15% | Prioritizes personally significant events |
-| Recency | 10% | Preserves continuity with recent experience |
+- Windows, macOS, or Linux;
+- Python 3.10 (the committed lock file was verified with Python 3.10);
+- Godot 4.4 or newer for the graphical client;
+- a valid OpenAI API key for live AI operations.
 
-After ranking, the system reopens the nearby narrative window rather than responding from an isolated memory summary.
+`requirements.txt` explicitly pins both direct and transitive Python packages. Godot is a standalone application and is therefore installed separately, not through `pip`.
 
-The public Python core implements these weights in `src/memory_retrieval.py`. Every selected memory is logged with its four raw signals and weighted contribution, so retrieval decisions can be inspected instead of hidden inside one opaque similarity score.
+## Installation
 
-### 4. Reflection and behavior policy
-
-Retrieved evidence becomes a short reflection plan. A behavior policy then selects an interaction intent—ask, reframe, nudge, mirror, or pause—before the model writes the final response. This separates *what the agent should do* from *how the final sentence should sound*.
-
-The policy is constrained to retrieved memory IDs and has a deterministic local fallback. When grounded context is missing, the mirror asks rather than inventing a personal claim.
-
-## Technology
-
-- **Godot:** embodied room, pixel avatar, interaction and dialogue states
-- **Flask / Python:** orchestration, memory services, interviews, and export
-- **GPT:** adaptive conversation, extraction, reflection, planning, and response generation
-- **Structured files + embeddings:** persistent memory nodes, narrative windows, and retrieval
-
-## Responsible design boundaries
-
-- The interface identifies the character as a mirror, not the real person.
-- New claims from a visitor do not silently become facts about the owner.
-- The agent should not invent private memories or relationships.
-- Memory should be inspectable, correctable, and removable by the user.
-- Sensitive deployments require explicit retention, consent, and escalation policies.
-
-## What I learned
-
-The strongest sense of continuity did not come from saving more text. It came from restoring the right narrative context and selecting an appropriate response action before generation. Memory quality, behavior policy, and communication style need to be designed as separate layers.
-
-## Status
-
-Interactive research prototype and portfolio case study. The public demo uses curated public memory; it does not expose a visitor's conversation history to the portfolio owner.
-
-## Source code
-
-This repository includes the working Python core used by the prototype:
-
-- `godot/` — clean Godot 4 client for interview, mirror chat, and event reflection
-- `server/` — Flask bridge and compatibility routes for the original EMO GYM GDScript
-- `src/mirror_agent.py` — command-line mirror chat, narrative restoration, and response orchestration
-- `src/interview_agent.py` — adaptive interview and memory extraction
-- `src/agent_io.py` — agent, session, and memory persistence helpers
-- `src/memory_retrieval.py` — inspectable semantic, emotion, salience, and recency scoring
-- `src/response_policy.py` — constrained reflection/action planning and safe fallbacks
-- `src/build_agent.py` — persona workspace creation
-- `examples/` — example interview and MBTI prompt pools
-- `tests/` — offline unit tests for retrieval weights, grounding, and policy constraints
-
-Private interview sessions, embeddings, recordings, generated agent memories, and API credentials are intentionally excluded.
-
-The original exhibition folder also contains Godot import caches, local audio output, hardware-specific adapters, and artwork/font packages with separate provenance. Those are not copied into this public repository. The included Godot client is self-contained and uses only native controls, while preserving the actual HTTP send/receive architecture.
-
-### Prerequisites
-
-- Python 3.10 (the committed dependency lock was verified with this version)
-- Godot 4.4 or newer for the embodied client
-- An OpenAI API key for live interview and mirror generation
-
-### Run locally
+Clone the repository and enter it:
 
 ```bash
-python -m venv .venv
-# Windows: .venv\Scripts\activate
-# macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
-copy .env.example .env  # use `cp` on macOS/Linux
-python src/mirror_agent.py
+git clone https://github.com/Liang-Tian-Cat/alter-emo-ai-mirror.git
+cd alter-emo-ai-mirror
 ```
 
-Add your own `OPENAI_API_KEY` to `.env`. Runtime memory is written under `agents/`, which is ignored by Git.
+Create and activate a virtual environment.
 
-The command-line modules load `.env` from the repository root. They initialize the OpenAI client only when an API-backed operation starts, so local commands such as `--help` and `--list` work without a key.
+Windows PowerShell:
 
-### Verify API configuration
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+```
+
+macOS/Linux:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+Verify the installed dependency graph:
+
+```bash
+python -m pip check
+```
+
+## Configuration
+
+Create a private `.env` file from the template.
+
+Windows PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+macOS/Linux:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env`:
+
+```dotenv
+OPENAI_API_KEY=
+OPENAI_PROJECT=
+CHAT_MODEL=gpt-4o-mini
+EMB_MODEL=text-embedding-3-small
+ALTER_EMO_HOST=127.0.0.1
+ALTER_EMO_PORT=5000
+ALTER_EMO_PERSONA_ID=demo-persona
+```
+
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `OPENAI_API_KEY` | For live AI calls | none | OpenAI authentication |
+| `OPENAI_PROJECT` | No | empty | Optional OpenAI project ID |
+| `CHAT_MODEL` | No | `gpt-4o-mini` | Interview and response model |
+| `EMB_MODEL` | No | `text-embedding-3-small` | Memory embedding model |
+| `ALTER_EMO_HOST` | No | `127.0.0.1` | Flask bind address |
+| `ALTER_EMO_PORT` | No | `5000` | Flask port |
+| `ALTER_EMO_PERSONA_ID` | No | `demo-persona` | Persona used by legacy routes |
+
+Never commit `.env` or paste a real API key into Python, GDScript, screenshots, or Git history.
+
+## Run the Godot application
+
+### 1. Start the Flask bridge
+
+From the repository root, with the virtual environment active:
+
+```bash
+python -m server.app
+```
+
+Expected output includes:
+
+```text
+Running on http://127.0.0.1:5000
+```
+
+Check the bridge in another terminal.
+
+Windows PowerShell:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:5000/health
+```
+
+macOS/Linux:
+
+```bash
+curl http://127.0.0.1:5000/health
+```
+
+Expected response:
+
+```json
+{
+  "ok": true,
+  "service": "alter-emo-godot-bridge",
+  "capabilities": {
+    "text": true,
+    "events": true,
+    "audio": false,
+    "printing": false
+  }
+}
+```
+
+### 2. Start Godot
+
+1. Open Godot 4.4 or newer.
+2. Import `godot/project.godot`.
+3. Run the project with **F5**.
+4. Enter a persona ID and select **Start mirror**.
+5. Answer the interview questions.
+6. After the interview reaches the `mirror` stage, use mirror chat or event reflection.
+
+The Godot client connects to `http://127.0.0.1:5000` by default. To use a different bridge address, change `base_url` on the `Api` node in `Main.tscn`.
+
+## Command-line usage
+
+The Python core can also run without Godot.
+
+Check API credentials and network access:
 
 ```bash
 python src/mirror_agent.py --check
 ```
 
-### Run an adaptive interview
-
-```bash
-python src/interview_agent.py
-```
-
-The interview question pools are read from `examples/`; session artifacts remain under the ignored `agents/` directory.
-
-### Create an empty persona workspace
+Create a persona workspace:
 
 ```bash
 python src/build_agent.py --id demo-persona
 ```
 
-### List personas
+Run the adaptive interview:
+
+```bash
+python src/interview_agent.py
+```
+
+List existing personas:
 
 ```bash
 python src/mirror_agent.py --list
 ```
 
-### Start a named mirror session
+Start mirror chat:
 
 ```bash
 python src/mirror_agent.py --id demo-persona --interlocutor self
 ```
 
-### Run the offline tests
+Use `--interlocutor self` when the persona owner is speaking. Other interlocutor names are treated as visitor sessions and are prevented from writing visitor claims into the owner's main memory stream.
+
+## HTTP API
+
+### Current API
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/health` | Service status and capability flags |
+| `POST` | `/v1/sessions` | Create an interview session |
+| `GET` | `/v1/sessions/<session_id>` | Read session state/current question |
+| `POST` | `/v1/sessions/<session_id>/messages` | Submit an interview answer or mirror message |
+| `POST` | `/v1/sessions/<session_id>/events` | Generate a structured event reflection |
+| `DELETE` | `/v1/sessions/<session_id>` | Delete the bridge session |
+
+Create a session:
+
+```bash
+curl -X POST http://127.0.0.1:5000/v1/sessions \
+  -H "Content-Type: application/json" \
+  -d '{"persona_id":"demo-persona","interlocutor":"self"}'
+```
+
+Submit an answer or message:
+
+```bash
+curl -X POST http://127.0.0.1:5000/v1/sessions/SESSION_ID/messages \
+  -H "Content-Type: application/json" \
+  -d '{"content":"I usually pause before making a difficult decision."}'
+```
+
+Reflect on an event after the interview is complete:
+
+```bash
+curl -X POST http://127.0.0.1:5000/v1/sessions/SESSION_ID/events \
+  -H "Content-Type: application/json" \
+  -d '{"event":"I avoided speaking during a difficult meeting."}'
+```
+
+### Original EMO GYM compatibility API
+
+The bridge preserves the original GDScript route names for incremental migration:
+
+| Method | Endpoint | Status |
+| --- | --- | --- |
+| `GET` | `/next_question` | Supported |
+| `POST` | `/text_input` | Supported |
+| `POST` | `/simulate_event` | Supported |
+| `POST` | `/reset_interview` | Supported |
+| `GET/POST` | `/start_recording` | Returns 501 |
+| `GET/POST` | `/stop_recording` | Returns 501 |
+| `POST` | `/tts_speak` | Returns 501 |
+| `POST` | `/simulate_and_print` | Returns 501 |
+
+Audio recording, speech synthesis, and physical printing are hardware-specific optional adapters and are not enabled in this public build.
+
+## Testing
+
+Run all offline tests from the repository root:
 
 ```bash
 python -m unittest discover -s tests -v
 ```
 
-### Run the Godot bridge
+The suite covers:
 
-Install the complete dependency lock and start Flask from the repository root:
+- retrieval weights and score components;
+- grounded response-policy constraints;
+- visitor/persona/session memory isolation;
+- runtime paths and persona creation;
+- modern Flask API workflow;
+- original EMO GYM compatibility routes;
+- failed-ingestion retry behavior;
+- Godot project/API contract and embedded-key checks.
 
-```bash
-pip install -r requirements.txt
-python -m server.app
+Tests use a fake core adapter for HTTP workflow tests, so the test suite does not spend API credits and does not require an OpenAI key.
+
+## Data and persistence
+
+Persona data is stored as local JSON/NDJSON files under `agents/<persona_id>/`:
+
+- `meta.json` — persona identity, style, model metadata, and provenance;
+- `memory_stream/nodes.ndjson` — structured memory nodes;
+- `memory_stream/embeddings_event.ndjson` — semantic/event vectors;
+- `memory_stream/embeddings_emotion.ndjson` — emotion vectors;
+- `sessions/` — interview conversations and reflections;
+- `mirror_sessions/` — mirror dialogue and retrieval logs.
+
+Bridge state is stored under `runtime/bridge_sessions/`. Deleting a session through the API removes its bridge snapshot; it does not automatically erase the persona's long-term memory directory.
+
+## Troubleshooting
+
+### `401` or `invalid_api_key`
+
+Replace `OPENAI_API_KEY` in `.env` with a currently valid key, then restart Flask. Do not reuse or commit an exposed key.
+
+### Godot reports a bridge connection error
+
+- confirm `python -m server.app` is still running;
+- open `http://127.0.0.1:5000/health`;
+- confirm the Godot `Api.base_url` matches `ALTER_EMO_HOST` and `ALTER_EMO_PORT`;
+- check that another program is not using port 5000.
+
+### Flask returns `502`
+
+The bridge uses `502` for upstream model/configuration failures. Read the Flask terminal output, verify the API key and selected model names, then retry. A failed final interview ingestion rolls the answer back so the last answer can be submitted again safely.
+
+### PowerShell blocks virtual-environment activation
+
+Either allow the local activation script for the current process or call the virtual-environment interpreter directly:
+
+```powershell
+.venv\Scripts\python.exe -m server.app
 ```
 
-Then open `godot/project.godot` in Godot 4.4 or newer and run the main scene. The client connects to `http://127.0.0.1:5000`, starts an adaptive interview, sends answers and mirror messages, and displays structured event reflections.
+### No audio/TTS/printing
 
-The bridge also keeps the original prototype route names—`/next_question`, `/text_input`, `/simulate_event`, and `/reset_interview`—so the earlier EMO GYM GDScript can be migrated incrementally. Recording, TTS, and physical printing are intentionally reported as unavailable in the public build until explicit, credential-free adapters are configured.
+This is expected in the public version. The health response reports `audio: false` and `printing: false`; the related compatibility routes return HTTP 501.
 
-### Dependencies
+## Production limitations
 
-`requirements.txt` is the single installation entry point. It explicitly lists the verified direct and transitive Python packages for both the AI/memory core and the Flask/Godot bridge, so a fresh environment does not depend on an undocumented global package.
+This is a research prototype, not a production service:
 
-Godot is a standalone engine rather than a Python package, so install Godot 4.4 or newer separately. Recording, TTS, and physical printing are not active in the public build and therefore do not add unused hardware packages to the Python environment.
+- Flask's built-in development server is used;
+- sessions and memories are local files rather than a transactional database;
+- there is no authentication, authorization, encryption-at-rest, rate limiting, or multi-process coordination;
+- the API should remain bound to `127.0.0.1` unless production security is added;
+- model calls can incur cost and transmit submitted text to the configured provider.
 
-No virtual environment, generated Godot cache, user memory, recording, or API key belongs in Git.
+Do not expose this server directly to the public internet without adding a production WSGI server, authentication, request validation, encrypted storage, retention controls, audit logging, and deployment-specific privacy review.
+
+## License
+
+MIT. See `LICENSE`.
 
 ## Author
 
-Designed and developed by [Liang Tian](https://liang-tian.com).
+Liang Tian — [liang-tian.com](https://liang-tian.com)
