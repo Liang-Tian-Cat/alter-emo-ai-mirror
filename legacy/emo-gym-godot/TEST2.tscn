@@ -1,0 +1,70 @@
+[gd_scene load_steps=2 format=3 uid="uid://dq8lvg55lwa7e"]
+
+[ext_resource type="Script" uid="uid://dp5u5vtluhhxa" path="res://Main B.gd" id="1_gfdl3"]
+
+[node name="Test2" type="Node2D"]
+
+[node name="Panel" type="Panel" parent="."]
+offset_left = 17.0
+offset_top = 15.0
+offset_right = 285.0
+offset_bottom = 378.0
+script = ExtResource("1_gfdl3")
+
+[node name="HTTPRequest" type="HTTPRequest" parent="Panel"]
+
+[node name="RichTextLabel" type="RichTextLabel" parent="Panel"]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.0411818
+anchor_top = 0.134231
+anchor_right = 0.840818
+anchor_bottom = 0.826923
+offset_left = -2.06001
+offset_top = 0.0400009
+offset_right = 0.019989
+theme_override_font_sizes/normal_font_size = 7
+text = "	\"I submitted the project too late and missed the review session.\",
+
+\"I argued with my friend over something trivial.\",
+
+\"I was rejected from a job I really wanted.\""
+metadata/_edit_use_anchors_ = true
+
+[node name="eventButton" type="Button" parent="Panel"]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.845
+anchor_top = 0.173
+anchor_right = 0.954727
+anchor_bottom = 0.25
+offset_left = 0.0999908
+offset_top = 0.00799942
+offset_right = -0.0400085
+metadata/_edit_use_anchors_ = true
+
+[node name="eventButton2" type="Button" parent="Panel"]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.85
+anchor_top = 0.452
+anchor_right = 0.945
+anchor_bottom = 0.529
+offset_top = -0.00800323
+offset_right = 0.0999908
+offset_bottom = -0.0160065
+metadata/_edit_use_anchors_ = true
+
+[node name="eventButton3" type="Button" parent="Panel"]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.836
+anchor_top = 0.683
+anchor_right = 0.955
+anchor_bottom = 0.76
+offset_left = 0.0800018
+offset_top = -0.0320053
+offset_right = -0.100006
+offset_bottom = -0.0400085
+grow_horizontal = 2
+grow_vertical = 2

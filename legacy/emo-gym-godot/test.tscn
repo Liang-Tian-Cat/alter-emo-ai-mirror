@@ -1,0 +1,20 @@
+[gd_scene load_steps=2 format=3 uid="uid://b845gkqxnnuvy"]
+
+[ext_resource type="Script" uid="uid://c70j5uigywgpx" path="res://test.gd" id="1_37kl0"]
+
+[node name="Test" type="Node2D"]
+position = Vector2(66, 49)
+
+[node name="Node2D" type="Node2D" parent="."]
+script = ExtResource("1_37kl0")
+
+[node name="simulateButton" type="Button" parent="Node2D"]
+offset_right = 8.0
+offset_bottom = 8.0
+metadata/_edit_use_anchors_ = true
+
+[node name="http" type="HTTPRequest" parent="Node2D"]
+
+[node name="outputLabel" type="RichTextLabel" parent="Node2D"]
+offset_right = 40.0
+offset_bottom = 40.0

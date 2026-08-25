@@ -58,6 +58,7 @@ alter-emo-ai-mirror/
 │   ├── Main.tscn             # Interview and mirror UI
 │   ├── scenes/MirrorWorld.tscn
 │   └── scripts/              # API, UI, world and player controllers
+├── legacy/emo-gym-godot/   # Sanitized original EMO GYM control-source snapshot
 ├── server/                 # Flask application and core adapter
 │   ├── app.py
 │   ├── bridge.py
