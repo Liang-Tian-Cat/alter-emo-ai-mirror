@@ -14,6 +14,7 @@ import json
 import uuid
 import time
 import random
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -523,7 +524,8 @@ Related memories: {rel_txt}
                 "turn_index": len(conversation_log)-1  # 刚加入的 user 答案位置
             }
         )
-        memory_cache.append({**node, "evt_vec": evt_vec, "emo_vec": emo_vec})
+        if node.get("persisted", True):
+            memory_cache.append({**node, "evt_vec": evt_vec, "emo_vec": emo_vec})
 
         q_text = ans  # 下一轮追问的查询文本
 
@@ -600,6 +602,21 @@ def main() -> None:
     meta_path = os.path.join(agent_dir, "meta.json")
     meta = load_or_init_meta(meta_path, pseudonym)
 
+    consent = input(
+        "是否同意将本次回答保存在本机的长期记忆中？输入 YES 同意，其它输入将退出："
+    ).strip()
+    if consent.upper() != "YES":
+        print("未获得明确同意；没有开始采访，也没有写入个人记忆。")
+        return
+    meta["consent"] = {
+        "status": True,
+        "scope": "private-reflection",
+        "updated_at": datetime.utcnow().isoformat() + "Z",
+    }
+    meta["memory_paused"] = False
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False, indent=2)
+
     mbti = input("请输入你的 MBTI（如 INFP）：").strip().upper().split("-")[0]
     pool = load_pool("mbti_pool.json")
 
@@ -669,7 +686,8 @@ def main() -> None:
                 "turn_index": len(conversation_log)-1  # 刚加入的 user 答案位置
             }
         )
-        memory_cache.append({**node, "evt_vec": evt_vec, "emo_vec": emo_vec})
+        if node.get("persisted", True):
+            memory_cache.append({**node, "evt_vec": evt_vec, "emo_vec": emo_vec})
 
         # Follow-ups
         generate_followups(ans, question, q.get("objective", ""), agent_dir)

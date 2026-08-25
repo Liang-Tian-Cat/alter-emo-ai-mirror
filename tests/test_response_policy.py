@@ -11,7 +11,7 @@ from response_policy import fallback_response_plan, normalize_response_plan
 class ResponsePolicyTests(unittest.TestCase):
     def test_missing_context_asks_instead_of_inventing(self):
         plan = fallback_response_plan("Tell me why I do this", has_context=False)
-        self.assertEqual(plan["action"], "ask")
+        self.assertEqual(plan["action"], "question")
 
     def test_model_action_is_constrained(self):
         plan = normalize_response_plan(

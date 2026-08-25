@@ -46,6 +46,11 @@ class MirrorIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             agent_dir = Path(directory) / "demo"
             agent_dir.mkdir()
+            (agent_dir / "meta.json").write_text(json.dumps({
+                "id": "demo",
+                "consent": {"status": True, "scope": "private-reflection"},
+                "memory_paused": False,
+            }), encoding="utf-8")
 
             with (
                 patch.object(mirror_agent, "build_corpus", return_value=[memory]),

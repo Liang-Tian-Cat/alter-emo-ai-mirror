@@ -9,6 +9,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Protocol
 
+from src.perspectives import resolve_perspective
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -20,6 +22,12 @@ class CoreAdapter(Protocol):
 
     def reflect_event(self, session: "SessionState", event: str) -> Dict[str, str]: ...
 
+    def next_interview_question(
+        self, session: "SessionState", question: Dict[str, Any], answer: str
+    ) -> Dict[str, Any] | None: ...
+
+    def set_consent(self, persona_id: str, granted: bool, scope: str) -> Dict[str, Any]: ...
+
 
 @dataclass
 class SessionState:
@@ -30,6 +38,10 @@ class SessionState:
     answers: List[Dict[str, Any]] = field(default_factory=list)
     question_index: int = 0
     stage: str = "interview"
+    perspective: str = "balanced"
+    consent_granted: bool = False
+    consent_scope: str = "none"
+    adaptive_followups: int = 0
 
     @property
     def current_question(self) -> Dict[str, Any] | None:
@@ -44,13 +56,26 @@ class SessionRepository:
         self._sessions: Dict[str, SessionState] = {}
         self._lock = threading.RLock()
 
-    def create(self, persona_id: str, interlocutor: str, questions: List[Dict[str, Any]]) -> SessionState:
+    def create(
+        self,
+        persona_id: str,
+        interlocutor: str,
+        questions: List[Dict[str, Any]],
+        *,
+        perspective: str = "balanced",
+        consent_granted: bool = False,
+        consent_scope: str = "none",
+    ) -> SessionState:
         with self._lock:
             session = SessionState(
                 id=uuid.uuid4().hex[:12],
                 persona_id=persona_id,
                 interlocutor=interlocutor,
                 questions=questions,
+                perspective=perspective,
+                consent_granted=consent_granted,
+                consent_scope=consent_scope,
+                stage="interview" if consent_granted else "consent",
             )
             self._sessions[session.id] = session
             self.save(session)
@@ -105,10 +130,48 @@ class BridgeService:
         self.repository = repository or SessionRepository()
         self.questions = questions or load_questions()
 
-    def start_session(self, persona_id: str, interlocutor: str = "self") -> Dict[str, Any]:
+    def start_session(
+        self,
+        persona_id: str,
+        interlocutor: str = "self",
+        *,
+        perspective: str = "balanced",
+        consent_granted: bool = False,
+        consent_scope: str = "private-reflection",
+    ) -> Dict[str, Any]:
         persona = persona_id.strip() or "demo-persona"
         speaker = interlocutor.strip() or "self"
-        session = self.repository.create(persona, speaker, list(self.questions))
+        perspective_id, _ = resolve_perspective(perspective)
+        session = self.repository.create(
+            persona,
+            speaker,
+            list(self.questions),
+            perspective=perspective_id,
+            consent_granted=bool(consent_granted),
+            consent_scope=consent_scope if consent_granted else "none",
+        )
+        if consent_granted:
+            setter = getattr(self.adapter, "set_consent", None)
+            if callable(setter):
+                setter(persona, True, consent_scope)
+        return self._snapshot(session)
+
+    def set_consent(self, session_id: str, granted: bool, scope: str = "private-reflection") -> Dict[str, Any]:
+        session = self.repository.get(session_id)
+        session.consent_granted = bool(granted)
+        session.consent_scope = scope if granted else "none"
+        session.stage = "interview" if granted else "consent"
+        setter = getattr(self.adapter, "set_consent", None)
+        if callable(setter):
+            setter(session.persona_id, granted, session.consent_scope)
+        self.repository.save(session)
+        return self._snapshot(session)
+
+    def set_perspective(self, session_id: str, perspective: str) -> Dict[str, Any]:
+        session = self.repository.get(session_id)
+        perspective_id, _ = resolve_perspective(perspective)
+        session.perspective = perspective_id
+        self.repository.save(session)
         return self._snapshot(session)
 
     def get_session(self, session_id: str) -> Dict[str, Any]:
@@ -119,6 +182,8 @@ class BridgeService:
         message = content.strip()
         if not message:
             raise ValueError("content is required")
+        if not session.consent_granted:
+            raise ValueError("Explicit consent is required before interviewing or storing memory")
 
         if session.stage == "interview":
             question = session.current_question
@@ -132,6 +197,23 @@ class BridgeService:
             })
             previous_index = session.question_index
             session.question_index += 1
+            followup_factory = getattr(self.adapter, "next_interview_question", None)
+            if (
+                callable(followup_factory)
+                and question.get("kind") != "adaptive_followup"
+                and session.adaptive_followups < 8
+            ):
+                followup = followup_factory(session, question, message)
+                if isinstance(followup, dict) and str(followup.get("question", "")).strip():
+                    followup = {
+                        "id": str(followup.get("id") or f"adaptive-{session.id}-{session.adaptive_followups + 1}"),
+                        "question": str(followup["question"]).strip(),
+                        "objective": str(followup.get("objective") or question.get("objective") or "deepen the narrative"),
+                        "kind": "adaptive_followup",
+                        "completion_score": followup.get("completion_score"),
+                    }
+                    session.questions.insert(session.question_index, followup)
+                    session.adaptive_followups += 1
             completed = session.question_index >= len(session.questions)
             if completed:
                 try:
@@ -171,7 +253,13 @@ class BridgeService:
         }
 
     def reflect_event_for_persona(self, persona_id: str, event: str) -> Dict[str, Any]:
-        session = self.repository.create(persona_id.strip() or "demo-persona", "self", list(self.questions))
+        session = self.repository.create(
+            persona_id.strip() or "demo-persona",
+            "self",
+            list(self.questions),
+            consent_granted=True,
+            consent_scope="private-reflection",
+        )
         session.stage = "mirror"
         session.question_index = len(session.questions)
         self.repository.save(session)
@@ -189,8 +277,12 @@ class BridgeService:
             "persona_id": session.persona_id,
             "interlocutor": session.interlocutor,
             "stage": session.stage,
+            "consent_granted": session.consent_granted,
+            "consent_scope": session.consent_scope,
+            "perspective": session.perspective,
             "question": question.get("question") if question else None,
             "question_id": question.get("id") if question else None,
             "question_index": session.question_index,
             "question_count": len(session.questions),
+            "adaptive_followups": session.adaptive_followups,
         }

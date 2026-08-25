@@ -1,0 +1,103 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/privacy_controller.gd" id="1_privacy"]
+[ext_resource type="Script" path="res://scripts/alter_emo_api.gd" id="2_api"]
+
+[node name="Privacy" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_privacy")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.055, 0.047, 0.078, 1)
+
+[node name="Api" type="Node" parent="."]
+script = ExtResource("2_api")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = -24.0
+offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Column" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="Margin/Column"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+text = "PRIVACY & MEMORY CONTROL"
+
+[node name="Top" type="HBoxContainer" parent="Margin/Column"]
+layout_mode = 2
+
+[node name="Persona" type="LineEdit" parent="Margin/Column/Top"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Persona ID"
+
+[node name="Load" type="Button" parent="Margin/Column/Top"]
+layout_mode = 2
+text = "Load"
+
+[node name="Status" type="Label" parent="Margin/Column"]
+layout_mode = 2
+text = "Loading…"
+
+[node name="Memories" type="ItemList" parent="Margin/Column"]
+custom_minimum_size = Vector2(0, 360)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Editor" type="TextEdit" parent="Margin/Column"]
+custom_minimum_size = Vector2(0, 170)
+layout_mode = 2
+placeholder_text = "Select a memory to inspect and revise it."
+wrap_mode = 1
+
+[node name="Actions" type="HBoxContainer" parent="Margin/Column"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Save" type="Button" parent="Margin/Column/Actions"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Save revision"
+
+[node name="Delete" type="Button" parent="Margin/Column/Actions"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Delete selected"
+
+[node name="Pause" type="CheckButton" parent="Margin/Column/Actions"]
+layout_mode = 2
+text = "Pause"
+
+[node name="Export" type="Button" parent="Margin/Column/Actions"]
+layout_mode = 2
+text = "Export ZIP"
+
+[node name="Back" type="Button" parent="Margin/Column"]
+layout_mode = 2
+text = "Back to mirror"
+
+[node name="Revoke" type="Button" parent="Margin/Column"]
+layout_mode = 2
+text = "Revoke consent and stop long-term memory"

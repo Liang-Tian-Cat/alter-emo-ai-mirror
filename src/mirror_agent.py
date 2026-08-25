@@ -38,6 +38,7 @@ from response_policy import (
     normalize_response_plan,
     response_instruction,
 )
+from perspectives import resolve_perspective
 from runtime_config import create_openai_client, load_settings
 
 # =========================
@@ -536,9 +537,9 @@ def build_response_plan(user_text: str, memories: List[Dict[str, Any]]) -> Dict[
     ]
     prompt = (
         "Plan one grounded mirror response. Return only JSON with this schema:\n"
-        '{"reflection":"short evidence-based observation","action":"ask|reframe|nudge|mirror|pause",'
+        '{"reflection":"short evidence-based observation","action":"question|reflect|reframe|ground|guide|validate|challenge|pause",'
         '"confidence":0.0,"grounding_ids":["retrieved-id"]}\n\n'
-        "Use only the supplied evidence. Choose ask when evidence is insufficient; never diagnose.\n"
+        "Use only the supplied evidence. Choose question when evidence is insufficient; never diagnose.\n"
         f"User message: {user_text}\n"
         f"Retrieved evidence: {json.dumps(evidence, ensure_ascii=False)}"
     )
@@ -562,10 +563,21 @@ def mirror_reply(
     user_text: str,
     interlocutor: str,
     session_id: str,
-    win_ctx: int
+    win_ctx: int,
+    perspective: str = "balanced",
+    persist_memory: bool = True,
 ) -> str:
+    meta = load_or_init_meta(os.path.join(agent_dir, "meta.json"), pseudonym)
+    if not bool((meta.get("consent") or {}).get("status")):
+        raise ValueError("Explicit consent is required before using persona memory")
+    persist_memory = persist_memory and not bool(meta.get("memory_paused"))
     style = _latest_style(agent_dir, pseudonym)
-    sys = _build_style_prompt(style)
+    perspective_id, perspective_config = resolve_perspective(perspective)
+    sys = (
+        _build_style_prompt(style)
+        + "\n\nSelected reflection perspective: " + perspective_config["name"]
+        + "\nPerspective rule: " + perspective_config["instruction"]
+    )
 
     # Build retrieval corpus (exclude latest in-process node if any)
     exclude_ids = set()
@@ -624,7 +636,7 @@ def mirror_reply(
         reply = "会。" if yesno_mode else "嗯。"
 
     # ====== Save strategy ======
-    SAVE_TO_MAIN = (interlocutor in (None, "", "self"))
+    SAVE_TO_MAIN = persist_memory and (interlocutor in (None, "", "self"))
 
     # 当前会话 turn 索引（用于 source 回溯） + 取上一条镜像回复文本
     sp = _mirror_session_paths(agent_dir, interlocutor, session_id)
@@ -664,12 +676,13 @@ def mirror_reply(
                 "turn_index": conv_len,
             },
         )
-        memory_cache.append({
-            **u_node,
-            "evt_vec": u_evt,
-            "emo_vec": u_emo_vec,
-            "_agent_dir": os.path.abspath(agent_dir),
-        })
+        if u_node.get("persisted", True):
+            memory_cache.append({
+                **u_node,
+                "evt_vec": u_evt,
+                "emo_vec": u_emo_vec,
+                "_agent_dir": os.path.abspath(agent_dir),
+            })
 
         # mirror node (embedding = user + reply)
         m_sum = summarize_answer(reply)
@@ -694,12 +707,13 @@ def mirror_reply(
                 "turn_index": conv_len + 1,
             },
         )
-        memory_cache.append({
-            **m_node,
-            "evt_vec": m_evt,
-            "emo_vec": m_emo_vec,
-            "_agent_dir": os.path.abspath(agent_dir),
-        })
+        if m_node.get("persisted", True):
+            memory_cache.append({
+                **m_node,
+                "evt_vec": m_evt,
+                "emo_vec": m_emo_vec,
+                "_agent_dir": os.path.abspath(agent_dir),
+            })
     else:
         # 🚫 Others: DO NOT write to main memory; only log session below
         # 临时节点（embedding 同样合并上下文）
@@ -751,6 +765,7 @@ def mirror_reply(
             for r in use
         ],
         "response_plan": response_plan,
+        "perspective": perspective_id,
         "retrieval_weights": RETRIEVAL_WEIGHTS,
         "win_ctx": win_ctx
     })

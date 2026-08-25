@@ -66,6 +66,18 @@ text = "demo-persona"
 layout_mode = 2
 text = "Start mirror"
 
+[node name="ConsentRow" type="HBoxContainer" parent="Margin/Column"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Consent" type="CheckBox" parent="Margin/Column/ConsentRow"]
+layout_mode = 2
+text = "I consent to private local memory"
+
+[node name="Perspective" type="OptionButton" parent="Margin/Column/ConsentRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
 [node name="Status" type="Label" parent="Margin/Column"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.49, 0.9, 0.73, 1)
@@ -90,6 +102,44 @@ wrap_mode = 1
 layout_mode = 2
 disabled = true
 text = "Send"
+
+[node name="VoiceRow" type="HBoxContainer" parent="Margin/Column"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Record" type="Button" parent="Margin/Column/VoiceRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Record"
+
+[node name="Speak" type="Button" parent="Margin/Column/VoiceRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Speak last reply"
+
+[node name="Export" type="Button" parent="Margin/Column/VoiceRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Export my data"
+
+[node name="Narrative" type="TextEdit" parent="Margin/Column"]
+custom_minimum_size = Vector2(0, 68)
+layout_mode = 2
+placeholder_text = "Write today's narrative: events, feelings, choices, and what mattered…"
+wrap_mode = 1
+
+[node name="NarrativeRow" type="HBoxContainer" parent="Margin/Column"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SaveNarrative" type="Button" parent="Margin/Column/NarrativeRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Save daily narrative"
+
+[node name="PauseMemory" type="CheckButton" parent="Margin/Column/NarrativeRow"]
+layout_mode = 2
+text = "Pause memory"
 
 [node name="EventLabel" type="Label" parent="Margin/Column"]
 layout_mode = 2
@@ -117,3 +167,9 @@ text = "Reset private session"
 [node name="World" type="Button" parent="Margin/Column"]
 layout_mode = 2
 text = "Open embodied mirror world"
+
+[node name="Privacy" type="Button" parent="Margin/Column"]
+layout_mode = 2
+text = "View, revise, or delete my memories"
+
+[node name="AudioPlayer" type="AudioStreamPlayer" parent="."]

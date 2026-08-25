@@ -34,6 +34,26 @@ class GodotContractTests(unittest.TestCase):
         self.assertIn("autonomous_patrol", player)
         self.assertIn('name="World"', main_scene)
         self.assertIn('res://scenes/MirrorWorld.tscn', main_script)
+        self.assertIn('name="Consent"', main_scene)
+        self.assertIn('name="Perspective"', main_scene)
+        self.assertIn('name="Record"', main_scene)
+        self.assertIn('name="Narrative"', main_scene)
+        self.assertIn('name="Privacy"', main_scene)
+        self.assertIn("api.add_daily_narrative", main_script)
+        self.assertIn("api.start_recording", main_script)
+
+    def test_privacy_scene_exposes_user_memory_controls(self):
+        scene = (ROOT / "godot" / "scenes" / "Privacy.tscn").read_text(encoding="utf-8")
+        script = (ROOT / "godot" / "scripts" / "privacy_controller.gd").read_text(encoding="utf-8")
+        api = (ROOT / "godot" / "scripts" / "alter_emo_api.gd").read_text(encoding="utf-8")
+        self.assertIn('name="Memories"', scene)
+        self.assertIn('name="Save"', scene)
+        self.assertIn('name="Delete"', scene)
+        self.assertIn('name="Revoke"', scene)
+        self.assertIn("api.revise_memory", script)
+        self.assertIn("api.delete_memory", script)
+        self.assertIn("api.revoke_persona_consent", script)
+        self.assertIn("/v1/audio/speech", api)
 
     def test_legacy_emo_gym_logic_snapshot_is_present_and_sanitized(self):
         legacy = ROOT / "legacy" / "emo-gym-godot"

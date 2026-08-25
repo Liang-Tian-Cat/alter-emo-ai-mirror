@@ -1,392 +1,283 @@
 # Alter Emo AI Mirror
 
-Alter Emo is a local Godot + Flask + Python prototype for building a conversational and embodied "AI mirror" from an adaptive interview and a persistent narrative-memory store.
+Local-first AI mirror application implemented with Godot 4, Flask, and Python. The system conducts an adaptive interview, builds a consent-controlled narrative memory, retrieves grounded personal context, plans a reflection action, and responds through a selectable perspective.
 
-This repository contains the runnable public implementation: a Godot 4 client, an HTTP bridge, interview ingestion, memory retrieval, response planning, mirror chat, event reflection, and offline tests. Private memories, recordings, credentials, generated caches, and third-party exhibition assets are not included.
+This document covers installation, execution, data flow, API contracts, and verification. Personal data, generated memories, API credentials, recordings, and Godot cache files are excluded from the repository.
 
-## Current status
+## Implemented system
 
-Verified on Windows with Python 3.10 and Godot 4.4:
+- Adaptive interviewing with objective-completion scoring and generated follow-up questions.
+- Structured daily narratives containing events, feelings, choices, values, and recurring patterns.
+- Separate semantic-event and emotional embeddings.
+- Five-factor long-term-memory gate:
 
-- clean virtual-environment installation from `requirements.txt`;
-- all 27 locked Python packages installed and `pip check` passed;
-- 16 offline tests passed;
-- Flask started locally and returned HTTP 200 from `/health`;
-- the Godot project, HTTP interface, and TileMap/navigation world loaded with Godot 4.4;
-- Godot successfully reached the local Flask health endpoint.
+  ```text
+  S = 0.30E + 0.25I + 0.20R + 0.15D + 0.10N
+  ```
 
-Live GPT generation requires a valid `OPENAI_API_KEY`. The repository can be installed and tested without a key, but interview ingestion, mirror replies, embeddings, and event reflection call the OpenAI API.
+  `E` is emotional intensity, `I` identity relevance, `R` recurrence, `D` decision relevance, and `N` novelty. The default persistence threshold is `0.42`; rejected turns remain in the current session but are not written to long-term memory.
+
+- Four-signal retrieval: semantic similarity 55%, emotional similarity 20%, stored salience 15%, and recency 10%.
+- Narrative context-window restoration and grounded memory IDs in response plans.
+- Memory compression with source-node traceability.
+- Measured message length, sentence rhythm, response cadence, and recurring vocabulary, combined with model-assisted value and boundary extraction.
+- Constrained reflection policies: question, reflect, reframe, ground, guide, validate, gently challenge, or pause.
+- Five selectable perspectives: balanced, efficiency-focused, relationship-focused, clarity-seeking, and tone-sensitive.
+- Godot TileMap world, collision, manual movement, target navigation, and autonomous patrol.
+- Microphone capture, speech-to-text, and text-to-speech through the local Flask bridge.
+- Explicit consent, pause/resume, view, revise, delete, revoke, and ZIP export controls for personal memory.
+- Compatibility endpoints and a sanitized source snapshot for the original EMO GYM Godot project.
 
 ## Architecture
 
 ```text
-Godot 4 client
-    ├── interview and mirror UI
-    ├── TileMapLayer world + collision
-    ├── manual and autonomous navigation
-    │ HTTP/JSON
-    ▼
-Flask bridge (server/)
-    ├── session and interview state
-    ├── legacy EMO GYM compatibility routes
-    └── AlterEmoCoreAdapter
-            │
-            ▼
-Python agent core (src/)
-    ├── interview extraction
-    ├── structured memory + narrative windows
-    ├── semantic/emotional/salience/recency retrieval
-    ├── reflection and response policy
-    └── mirror response generation
+Godot 4
+├── adaptive interview and mirror conversation
+├── daily narrative and perspective controls
+├── recording, playback, export, and memory manager
+└── embodied TileMap / NavigationAgent2D world
+             │ HTTP/JSON or audio bytes
+             ▼
+Flask bridge
+├── consent-aware session state
+├── audio capture / transcription / speech
+├── privacy and export API
+└── AlterEmoCoreAdapter
+             │
+             ▼
+Python agent core
+├── style and narrative extraction
+├── E/I/R/D/N salience gate
+├── event + emotion embeddings
+├── semantic/emotion/salience/recency retrieval
+├── compression and narrative-window restoration
+└── response planning, generation, and write-back
 ```
 
-The default retrieval score uses four inspectable signals:
-
-| Signal | Weight |
-| --- | ---: |
-| Semantic similarity | 0.55 |
-| Emotional similarity | 0.20 |
-| Salience | 0.15 |
-| Recency | 0.10 |
-
-## Repository layout
+## Repository structure
 
 ```text
 alter-emo-ai-mirror/
-├── godot/                  # Godot 4 client and main scene
+├── godot/
+│   ├── Main.tscn
 │   ├── project.godot
-│   ├── Main.tscn             # Interview and mirror UI
 │   ├── scenes/MirrorWorld.tscn
-│   └── scripts/              # API, UI, world and player controllers
-├── legacy/emo-gym-godot/   # Sanitized original EMO GYM control-source snapshot
-├── server/                 # Flask application and core adapter
-│   ├── app.py
-│   ├── bridge.py
-│   └── core_adapter.py
-├── src/                    # Interview, memory, retrieval, and mirror core
-├── examples/               # Public interview and prompt pools
-├── tests/                  # Offline unit and integration tests
-├── .env.example            # Environment-variable template
-└── requirements.txt        # Complete locked Python dependency set
+│   ├── scenes/Privacy.tscn
+│   └── scripts/
+├── legacy/emo-gym-godot/
+├── server/                 # Flask, session, audio, and core adapter
+├── src/                    # Agent, memory, salience, narrative, and policy modules
+├── examples/
+├── tests/
+├── .env.example
+└── requirements.txt
 ```
 
-The following runtime directories are generated locally and ignored by Git:
+Generated runtime data is written to ignored directories:
 
-- `agents/` — persona metadata, interview sessions, memories, and embeddings;
-- `runtime/bridge_sessions/` — Flask bridge session snapshots;
-- `.godot/` — Godot import/editor cache;
-- `.venv/` — Python virtual environment.
+- `agents/<persona_id>/` — consent metadata, memories, embeddings, narratives, interviews, conversations, compression records, and retrieval logs.
+- `runtime/bridge_sessions/` — resumable HTTP session snapshots.
+- `godot/.godot/` — Godot imports and editor cache.
+- `.venv/` — optional Python virtual environment.
 
 ## Requirements
 
-- Windows, macOS, or Linux;
-- Python 3.10 (the committed lock file was verified with Python 3.10);
-- Godot 4.4 or newer for the graphical client;
-- a valid OpenAI API key for live AI operations.
+- Python 3.10 or newer.
+- Godot 4.4 or newer.
+- A microphone for recording.
+- An OpenAI API key for embeddings, adaptive interviews, mirror responses, transcription, and speech synthesis.
 
-`requirements.txt` explicitly pins both direct and transitive Python packages. Godot is a standalone application and is therefore installed separately, not through `pip`.
+Godot is installed separately. Every Python runtime dependency, including microphone capture, is listed in `requirements.txt`.
 
 ## Installation
-
-Clone the repository and enter it:
 
 ```bash
 git clone https://github.com/Liang-Tian-Cat/alter-emo-ai-mirror.git
 cd alter-emo-ai-mirror
 ```
 
-Create and activate a virtual environment.
-
 Windows PowerShell:
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+python -m pip check
+Copy-Item .env.example .env
 ```
 
-macOS/Linux:
+macOS or Linux:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
+python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
-```
-
-Verify the installed dependency graph:
-
-```bash
 python -m pip check
-```
-
-## Configuration
-
-Create a private `.env` file from the template.
-
-Windows PowerShell:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-macOS/Linux:
-
-```bash
 cp .env.example .env
 ```
 
-Edit `.env`:
+Set at least the API key in `.env`:
 
 ```dotenv
-OPENAI_API_KEY=
+OPENAI_API_KEY=your_private_key
 OPENAI_PROJECT=
 CHAT_MODEL=gpt-4o-mini
 EMB_MODEL=text-embedding-3-small
+ALTER_EMO_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe
+ALTER_EMO_TTS_MODEL=gpt-4o-mini-tts
 ALTER_EMO_HOST=127.0.0.1
 ALTER_EMO_PORT=5000
 ALTER_EMO_PERSONA_ID=demo-persona
+ALTER_EMO_LEGACY_CONSENT=false
 ```
 
-| Variable | Required | Default | Purpose |
-| --- | --- | --- | --- |
-| `OPENAI_API_KEY` | For live AI calls | none | OpenAI authentication |
-| `OPENAI_PROJECT` | No | empty | Optional OpenAI project ID |
-| `CHAT_MODEL` | No | `gpt-4o-mini` | Interview and response model |
-| `EMB_MODEL` | No | `text-embedding-3-small` | Memory embedding model |
-| `ALTER_EMO_HOST` | No | `127.0.0.1` | Flask bind address |
-| `ALTER_EMO_PORT` | No | `5000` | Flask port |
-| `ALTER_EMO_PERSONA_ID` | No | `demo-persona` | Persona used by legacy routes |
+Do not commit `.env`. The modern Godot client records explicit consent in persona metadata. Set `ALTER_EMO_LEGACY_CONSENT=true` only when intentionally running the original compatibility scene, which has no consent widget.
 
-Never commit `.env` or paste a real API key into Python, GDScript, screenshots, or Git history.
+## Run the application
 
-## Run the Godot application
-
-### 1. Start the Flask bridge
-
-From the repository root, with the virtual environment active:
+Start the bridge from the repository root:
 
 ```bash
 python -m server.app
 ```
 
-Expected output includes:
-
-```text
-Running on http://127.0.0.1:5000
-```
-
-Check the bridge in another terminal.
-
-Windows PowerShell:
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:5000/health
-```
-
-macOS/Linux:
+Verify it in another terminal:
 
 ```bash
 curl http://127.0.0.1:5000/health
 ```
 
-Expected response:
+Then:
 
-```json
-{
-  "ok": true,
-  "service": "alter-emo-godot-bridge",
-  "capabilities": {
-    "text": true,
-    "events": true,
-    "audio": false,
-    "printing": false
-  }
-}
-```
+1. Open Godot 4.4 or newer and import `godot/project.godot`.
+2. Press **F5** to run `Main.tscn`.
+3. Enter a persona ID, select a perspective, read the consent label, and opt in.
+4. Complete the adaptive interview. A short answer can cause a relevant follow-up before the next base question.
+5. Chat with the mirror, reflect on an event, or save a daily narrative.
+6. Use **Record** / **Stop & transcribe** for microphone input and **Speak last reply** for playback.
+7. Open the privacy screen to inspect, revise, delete, pause, revoke, or export personal memory.
+8. Open the embodied world for TileMap navigation. Arrow keys move manually; keys `1`–`4` select destinations; idle mode resumes autonomous patrol.
 
-### 2. Start Godot
+The client defaults to `http://127.0.0.1:5000`. Change `base_url` on a Godot `Api` node when the bridge uses another address.
 
-1. Open Godot 4.4 or newer.
-2. Import `godot/project.godot`.
-3. Run the project with **F5**.
-4. Enter a persona ID and select **Start mirror**.
-5. Answer the interview questions.
-6. After the interview reaches the `mirror` stage, use mirror chat or event reflection.
-7. Select **Open embodied mirror world** for the TileMap/navigation mode.
-
-In the embodied world, use the arrow keys for manual movement or keys `1`–`4` for target navigation. The character resumes autonomous patrol while idle. Touch-friendly destination buttons provide the same controls, and the status line confirms whether the Flask bridge is reachable.
-
-The Godot client connects to `http://127.0.0.1:5000` by default. To use a different bridge address, change `base_url` on the `Api` node in `Main.tscn`.
-
-## Command-line usage
-
-The Python core can also run without Godot.
-
-Check API credentials and network access:
+## Command-line operation
 
 ```bash
 python src/mirror_agent.py --check
-```
-
-Create a persona workspace:
-
-```bash
 python src/build_agent.py --id demo-persona
-```
-
-Run the adaptive interview:
-
-```bash
 python src/interview_agent.py
-```
-
-List existing personas:
-
-```bash
-python src/mirror_agent.py --list
-```
-
-Start mirror chat:
-
-```bash
 python src/mirror_agent.py --id demo-persona --interlocutor self
 ```
 
-Use `--interlocutor self` when the persona owner is speaking. Other interlocutor names are treated as visitor sessions and are prevented from writing visitor claims into the owner's main memory stream.
+The interview asks for an explicit `YES` before writing memory. Non-`self` interlocutors are isolated visitor sessions and cannot write claims into the owner's long-term memory.
 
 ## HTTP API
 
-### Current API
+### Session and reflection
 
-| Method | Endpoint | Description |
+| Method | Endpoint | Function |
 | --- | --- | --- |
-| `GET` | `/health` | Service status and capability flags |
-| `POST` | `/v1/sessions` | Create an interview session |
-| `GET` | `/v1/sessions/<session_id>` | Read session state/current question |
-| `POST` | `/v1/sessions/<session_id>/messages` | Submit an interview answer or mirror message |
-| `POST` | `/v1/sessions/<session_id>/events` | Generate a structured event reflection |
-| `DELETE` | `/v1/sessions/<session_id>` | Delete the bridge session |
+| `GET` | `/health` | Runtime capability and configuration status |
+| `GET` | `/v1/perspectives` | List reflection perspectives |
+| `POST` | `/v1/sessions` | Create a consent-aware interview session |
+| `GET` | `/v1/sessions/<id>` | Read stage and current question |
+| `PUT` | `/v1/sessions/<id>/consent` | Grant or revoke session consent |
+| `PUT` | `/v1/sessions/<id>/perspective` | Change active perspective |
+| `POST` | `/v1/sessions/<id>/messages` | Submit an answer or mirror message |
+| `POST` | `/v1/sessions/<id>/events` | Generate structured event reflection |
+| `DELETE` | `/v1/sessions/<id>` | Delete the bridge-session snapshot |
 
-Create a session:
+Create a session with explicit consent:
 
 ```bash
 curl -X POST http://127.0.0.1:5000/v1/sessions \
   -H "Content-Type: application/json" \
-  -d '{"persona_id":"demo-persona","interlocutor":"self"}'
+  -d '{"persona_id":"demo-persona","interlocutor":"self","perspective":"clarity","consent":true}'
 ```
 
-Submit an answer or message:
+### Narrative, memory, and privacy
 
-```bash
-curl -X POST http://127.0.0.1:5000/v1/sessions/SESSION_ID/messages \
-  -H "Content-Type: application/json" \
-  -d '{"content":"I usually pause before making a difficult decision."}'
-```
-
-Reflect on an event after the interview is complete:
-
-```bash
-curl -X POST http://127.0.0.1:5000/v1/sessions/SESSION_ID/events \
-  -H "Content-Type: application/json" \
-  -d '{"event":"I avoided speaking during a difficult meeting."}'
-```
-
-### Original EMO GYM compatibility API
-
-The bridge preserves the original GDScript route names for incremental migration:
-
-| Method | Endpoint | Status |
+| Method | Endpoint | Function |
 | --- | --- | --- |
-| `GET` | `/next_question` | Supported |
-| `POST` | `/text_input` | Supported |
-| `POST` | `/simulate_event` | Supported |
-| `POST` | `/reset_interview` | Supported |
-| `GET/POST` | `/start_recording` | Returns 501 |
-| `GET/POST` | `/stop_recording` | Returns 501 |
-| `POST` | `/tts_speak` | Returns 501 |
-| `POST` | `/simulate_and_print` | Returns 501 |
+| `POST` | `/v1/personas/<id>/narratives` | Parse and store daily narrative |
+| `GET` | `/v1/personas/<id>/narratives` | List structured narratives |
+| `POST` | `/v1/personas/<id>/compress` | Compress next eligible memory chunk |
+| `GET` | `/v1/personas/<id>/memories` | View memories and salience components |
+| `PATCH` | `/v1/personas/<id>/memories/<memory_id>` | Revise memory and refresh semantic vector |
+| `DELETE` | `/v1/personas/<id>/memories/<memory_id>` | Delete memory and both vectors |
+| `PUT` | `/v1/personas/<id>/memory-state` | Pause or resume future writes |
+| `PUT` | `/v1/personas/<id>/consent` | Revoke or update persona consent |
+| `GET` | `/v1/personas/<id>/export` | Export complete persona directory as ZIP |
+| `DELETE` | `/v1/personas/<id>` | Delete all persona data; confirmation must equal ID |
 
-Audio recording, speech synthesis, and physical printing are hardware-specific optional adapters and are not enabled in this public build.
+Full deletion requires an exact body:
 
-## Testing
+```bash
+curl -X DELETE http://127.0.0.1:5000/v1/personas/demo-persona \
+  -H "Content-Type: application/json" \
+  -d '{"confirm":"demo-persona"}'
+```
 
-Run all offline tests from the repository root:
+### Audio and compatibility
+
+| Method | Endpoint | Function |
+| --- | --- | --- |
+| `POST` | `/v1/audio/transcriptions` | Transcribe multipart field `audio` |
+| `POST` | `/v1/audio/speech` | Return MP3 speech |
+| `GET/POST` | `/start_recording` | Start server-host microphone capture |
+| `GET/POST` | `/stop_recording` | Stop, transcribe, and submit voice turn |
+| `POST` | `/tts_speak` | Compatibility speech endpoint |
+| `POST` | `/simulate_and_print` | Compatibility export endpoint returning ZIP |
+
+The original `/next_question`, `/text_input`, `/simulate_event`, and `/reset_interview` routes remain supported.
+
+## Data and privacy behavior
+
+- New personas default to `consent.status=false`. Personal-memory operations require an explicit grant.
+- Revoking consent stops long-term memory immediately. Pause/resume is a temporary control.
+- Low-salience turns are not written to nodes or embedding files.
+- Every stored node contains E/I/R/D/N components, threshold, weighted score, and persistence decision.
+- Revision refreshes the semantic vector. Deletion removes the node and both vector records.
+- Visitor conversations are session-scoped and excluded from owner memory.
+- Data is local and ignored by Git. Model-backed operations transmit submitted input to the configured provider.
+- The bridge binds to loopback by default. Do not expose the development server directly to the internet.
+
+## Verification
+
+Run all offline tests without an API key:
 
 ```bash
 python -m unittest discover -s tests -v
 ```
 
-The suite covers:
+The suite verifies retrieval weights, the five-factor salience gate, memory controls and ZIP export, narrative compression, response-policy constraints, consent, adaptive follow-ups, rollback, audio contracts, visitor isolation, runtime paths, and Godot scene/API contracts.
 
-- retrieval weights and score components;
-- grounded response-policy constraints;
-- visitor/persona/session memory isolation;
-- runtime paths and persona creation;
-- modern Flask API workflow;
-- original EMO GYM compatibility routes;
-- failed-ingestion retry behavior;
-- Godot project/API contract and embedded-key checks.
-
-Tests use a fake core adapter for HTTP workflow tests, so the test suite does not spend API credits and does not require an OpenAI key.
-
-## Data and persistence
-
-Persona data is stored as local JSON/NDJSON files under `agents/<persona_id>/`:
-
-- `meta.json` — persona identity, style, model metadata, and provenance;
-- `memory_stream/nodes.ndjson` — structured memory nodes;
-- `memory_stream/embeddings_event.ndjson` — semantic/event vectors;
-- `memory_stream/embeddings_emotion.ndjson` — emotion vectors;
-- `sessions/` — interview conversations and reflections;
-- `mirror_sessions/` — mirror dialogue and retrieval logs.
-
-Bridge state is stored under `runtime/bridge_sessions/`. Deleting a session through the API removes its bridge snapshot; it does not automatically erase the persona's long-term memory directory.
+For live verification, configure `.env`, start Flask, complete one Godot interview, create a daily narrative, inspect it from the privacy screen, record a voice turn, and export the persona ZIP.
 
 ## Troubleshooting
 
-### `401` or `invalid_api_key`
+### Invalid API key or HTTP 502
 
-Replace `OPENAI_API_KEY` in `.env` with a currently valid key, then restart Flask. Do not reuse or commit an exposed key.
+Confirm the API key, model names, and network access, then restart Flask. Failed final interview ingestion is rolled back so the answer can be retried.
 
-### Godot reports a bridge connection error
+### Microphone cannot start
 
-- confirm `python -m server.app` is still running;
-- open `http://127.0.0.1:5000/health`;
-- confirm the Godot `Api.base_url` matches `ALTER_EMO_HOST` and `ALTER_EMO_PORT`;
-- check that another program is not using port 5000.
+Allow microphone access for Python, confirm an operating-system input device is selected, and reinstall `requirements.txt` if `sounddevice` is missing.
 
-### Flask returns `502`
+### Godot cannot reach Flask
 
-The bridge uses `502` for upstream model/configuration failures. Read the Flask terminal output, verify the API key and selected model names, then retry. A failed final interview ingestion rolls the answer back so the last answer can be submitted again safely.
+Confirm Flask is running, open `/health`, and verify `Api.base_url` in Godot.
 
-### PowerShell blocks virtual-environment activation
+### Consent error
 
-Either allow the local activation script for the current process or call the virtual-environment interpreter directly:
+Use the modern client's consent checkbox. API callers must send `"consent": true` or grant consent through the session endpoint before submitting personal content.
 
-```powershell
-.venv\Scripts\python.exe -m server.app
-```
+## Operational boundary
 
-### No audio/TTS/printing
-
-This is expected in the public version. The health response reports `audio: false` and `printing: false`; the related compatibility routes return HTTP 501.
-
-## Production limitations
-
-This is a research prototype, not a production service:
-
-- Flask's built-in development server is used;
-- sessions and memories are local files rather than a transactional database;
-- there is no authentication, authorization, encryption-at-rest, rate limiting, or multi-process coordination;
-- the API should remain bound to `127.0.0.1` unless production security is added;
-- model calls can incur cost and transmit submitted text to the configured provider.
-
-Do not expose this server directly to the public internet without adding a production WSGI server, authentication, request validation, encrypted storage, retention controls, audit logging, and deployment-specific privacy review.
+This repository is a complete local application. Public multi-user deployment is a separate operational concern and requires authentication, authorization, TLS, encrypted storage, rate limits, a production WSGI server, retention policies, and deployment-specific privacy review.
 
 ## License
 
 MIT. See `LICENSE`.
-
-## Author
-
-Liang Tian — [liang-tian.com](https://liang-tian.com)

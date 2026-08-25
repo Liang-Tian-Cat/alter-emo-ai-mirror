@@ -4,7 +4,11 @@ import json
 import uuid
 import time
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+from memory_store import read_ndjson
+from salience import DEFAULT_THRESHOLD, evaluate_salience
 
 # 顶层目录（每个人格一个子目录）
 OUT_DIR: str   = "agents"
@@ -60,7 +64,10 @@ def load_or_init_meta(meta_path: str, pseudonym: str) -> Dict[str, Any]:
         "recurring_vocabulary": [], "attribution": ""
     })
     meta.setdefault("model_info", {})
-    meta.setdefault("consent", {"status": True, "scope": "research-only"})
+    # Consent is opt-in.  Older workspaces are preserved, while every new
+    # persona starts paused until a client records an explicit grant.
+    meta.setdefault("consent", {"status": False, "scope": "none", "updated_at": None})
+    meta.setdefault("memory_paused", False)
     meta.setdefault("provenance", {"last_session_id": None, "sessions": []})
     return meta
 
@@ -104,6 +111,8 @@ def save_memory_node_dual(
     # NEW 可选字段
     source: Optional[Dict[str, Any]] = None,
     extra: Optional[Dict[str, Any]] = None,
+    enforce_salience_gate: bool = True,
+    salience_threshold: float = DEFAULT_THRESHOLD,
 ) -> Dict[str, Any]:
     """
     保存一个记忆节点到 nodes.ndjson，并把事件/情绪向量分别写到
@@ -116,6 +125,14 @@ def save_memory_node_dual(
     os.makedirs(agent_dir, exist_ok=True)
     p = _paths(agent_dir)
 
+    existing = read_ndjson(Path(p["nodes_nd"]))
+    decision = evaluate_salience(
+        text,
+        emotion_tag=emotion_tag,
+        importance=importance,
+        existing_memories=existing,
+        threshold=salience_threshold,
+    )
     nid = str(uuid.uuid4())
     node: Dict[str, Any] = {
         "id": nid,
@@ -126,6 +143,8 @@ def save_memory_node_dual(
         "summary": summary,                # 简短摘要（如前缀 - Q: ...）
         "importance": int(importance),     # 0~100
         "emotion_tag": emotion_tag or {},  # {"emotion": "...", "tone": ["...","..."]}
+        "salience": decision.to_dict(),
+        "persisted": bool(decision.store or not enforce_salience_gate),
     }
     if source:
         # 例如 {"kind":"interview","session_id":"abc123","turn_index":5}
@@ -135,6 +154,11 @@ def save_memory_node_dual(
         for k, v in extra.items():
             if k not in node:
                 node[k] = v
+
+    # Low-salience turns remain available to the current session but do not
+    # enter the long-term stream. The returned decision makes this observable.
+    if enforce_salience_gate and not decision.store:
+        return node
 
     # --- 新格式：逐行写入 ---
     _append_ndjson(p["nodes_nd"], node)
