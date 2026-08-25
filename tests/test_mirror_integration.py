@@ -77,6 +77,39 @@ class MirrorIntegrationTests(unittest.TestCase):
             self.assertEqual(log["response_plan"]["grounding_ids"], ["memory-1"])
             self.assertEqual(log["retrieval_weights"], mirror_agent.RETRIEVAL_WEIGHTS)
 
+    def test_temporary_memories_are_scoped_to_persona_and_session(self):
+        with tempfile.TemporaryDirectory() as directory:
+            persona_a = Path(directory) / "persona-a"
+            persona_b = Path(directory) / "persona-b"
+            persona_a.mkdir()
+            persona_b.mkdir()
+            mirror_agent.memory_cache.extend([
+                {
+                    "id": "same-session",
+                    "mtype": "mirror_user_temp",
+                    "_agent_dir": os.path.abspath(persona_a),
+                    "source": {"interlocutor": "visitor", "session_id": "session-a"},
+                },
+                {
+                    "id": "other-session",
+                    "mtype": "mirror_user_temp",
+                    "_agent_dir": os.path.abspath(persona_a),
+                    "source": {"interlocutor": "visitor", "session_id": "session-b"},
+                },
+                {
+                    "id": "other-persona",
+                    "mtype": "mirror_user_temp",
+                    "_agent_dir": os.path.abspath(persona_b),
+                    "source": {"interlocutor": "visitor", "session_id": "session-a"},
+                },
+            ])
+
+            corpus = mirror_agent.build_corpus(
+                str(persona_a), interlocutor="visitor", session_id="session-a"
+            )
+
+            self.assertEqual([node["id"] for node in corpus], ["same-session"])
+
 
 if __name__ == "__main__":
     unittest.main()

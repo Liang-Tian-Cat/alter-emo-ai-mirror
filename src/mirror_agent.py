@@ -228,11 +228,33 @@ def _id_set(items: List[Dict[str, Any]]) -> set:
             s.add(nid)
     return s
 
-def build_corpus(agent_dir: str, exclude_ids: set | None = None) -> List[Dict[str, Any]]:
+def build_corpus(
+    agent_dir: str,
+    exclude_ids: set | None = None,
+    interlocutor: str | None = None,
+    session_id: str | None = None,
+) -> List[Dict[str, Any]]:
     exclude_ids = exclude_ids or set()
     past_nodes = load_corpus_from_memory_stream(agent_dir)
     past_ids = _id_set(past_nodes)
-    mem_extra = [m for m in memory_cache if (m.get("id") or m.get("node_id")) not in past_ids]
+    agent_scope = os.path.abspath(agent_dir)
+
+    def in_scope(memory: Dict[str, Any]) -> bool:
+        if memory.get("_agent_dir") != agent_scope:
+            return False
+        if not str(memory.get("mtype", "")).endswith("_temp"):
+            return True
+        source = memory.get("source") or {}
+        return (
+            source.get("interlocutor") == interlocutor
+            and source.get("session_id") == session_id
+        )
+
+    mem_extra = [
+        memory
+        for memory in memory_cache
+        if in_scope(memory) and (memory.get("id") or memory.get("node_id")) not in past_ids
+    ]
     merged = past_nodes + mem_extra
     merged = _dedup_by_id(merged)
     if exclude_ids:
@@ -553,7 +575,12 @@ def mirror_reply(
         if lid:
             exclude_ids.add(lid)
 
-    corpus = build_corpus(agent_dir, exclude_ids=exclude_ids) or build_corpus(agent_dir)
+    corpus = build_corpus(
+        agent_dir,
+        exclude_ids=exclude_ids,
+        interlocutor=interlocutor,
+        session_id=session_id,
+    ) or build_corpus(agent_dir, interlocutor=interlocutor, session_id=session_id)
     rel_raw = search_similar_nodes_dual_robust(user_text, corpus, get_embedding, extract_emotion_tag, cosine)
     use = park_like_select(rel_raw, top_k=TOP_K, min_score=REL_MIN_SCORE, min_evt=REL_MIN_EVT, delta=DELTA_BAND)
 
@@ -637,7 +664,12 @@ def mirror_reply(
                 "turn_index": conv_len,
             },
         )
-        memory_cache.append({**u_node, "evt_vec": u_evt, "emo_vec": u_emo_vec})
+        memory_cache.append({
+            **u_node,
+            "evt_vec": u_evt,
+            "emo_vec": u_emo_vec,
+            "_agent_dir": os.path.abspath(agent_dir),
+        })
 
         # mirror node (embedding = user + reply)
         m_sum = summarize_answer(reply)
@@ -662,7 +694,12 @@ def mirror_reply(
                 "turn_index": conv_len + 1,
             },
         )
-        memory_cache.append({**m_node, "evt_vec": m_evt, "emo_vec": m_emo_vec})
+        memory_cache.append({
+            **m_node,
+            "evt_vec": m_evt,
+            "emo_vec": m_emo_vec,
+            "_agent_dir": os.path.abspath(agent_dir),
+        })
     else:
         # 🚫 Others: DO NOT write to main memory; only log session below
         # 临时节点（embedding 同样合并上下文）
@@ -675,6 +712,7 @@ def mirror_reply(
             "evt_vec": u_evt, "emo_vec": u_emo_vec,
             "emotion_tag": u_tag,
             "mtype": "mirror_user_temp",
+            "_agent_dir": os.path.abspath(agent_dir),
             "source": {"kind":"mirror","interlocutor": interlocutor,"session_id": session_id,"turn_index": conv_len}
         })
         m_tag = extract_emotion_tag(reply)
@@ -686,6 +724,7 @@ def mirror_reply(
             "evt_vec": m_evt, "emo_vec": m_emo_vec,
             "emotion_tag": m_tag,
             "mtype": "mirror_reply_temp",
+            "_agent_dir": os.path.abspath(agent_dir),
             "source": {"kind":"mirror","interlocutor": interlocutor,"session_id": session_id,"turn_index": conv_len+1}
         })
 

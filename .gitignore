@@ -4,7 +4,11 @@ __pycache__/
 *.py[cod]
 agents/
 mirror_sessions/
+runtime/
 recordings/
 *.wav
 *.mp3
+.godot/
+godot/export/
+*.pck
 .DS_Store

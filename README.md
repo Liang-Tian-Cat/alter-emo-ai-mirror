@@ -34,16 +34,18 @@ The system is designed around user agency: the mirror grows only from material t
 
 ```mermaid
 flowchart LR
-    A[Conversation / diary / interview] --> B[Narrative parser]
-    B --> C[Memory index]
-    B --> D[Narrative store]
-    C --> E[Hybrid retrieval]
-    D --> E
-    E --> F[Reflection + planning]
-    F --> G[Behavior policy]
-    G --> H[Mirror reply]
-    H --> C
-    H --> D
+    A[Godot room / conversation / event] --> B[Flask bridge]
+    B --> C[Narrative parser]
+    C --> D[Memory index]
+    C --> E[Narrative store]
+    D --> F[Hybrid retrieval]
+    E --> F
+    F --> G[Reflection + planning]
+    G --> H[Behavior policy]
+    H --> I[Mirror reply]
+    I --> B
+    I --> D
+    I --> E
 ```
 
 ### 1. Conversation capture
@@ -105,6 +107,8 @@ Interactive research prototype and portfolio case study. The public demo uses cu
 
 This repository includes the working Python core used by the prototype:
 
+- `godot/` — clean Godot 4 client for interview, mirror chat, and event reflection
+- `server/` — Flask bridge and compatibility routes for the original EMO GYM GDScript
 - `src/mirror_agent.py` — command-line mirror chat, narrative restoration, and response orchestration
 - `src/interview_agent.py` — adaptive interview and memory extraction
 - `src/agent_io.py` — agent, session, and memory persistence helpers
@@ -115,6 +119,8 @@ This repository includes the working Python core used by the prototype:
 - `tests/` — offline unit tests for retrieval weights, grounding, and policy constraints
 
 Private interview sessions, embeddings, recordings, generated agent memories, and API credentials are intentionally excluded.
+
+The original exhibition folder also contains Godot import caches, local audio output, hardware-specific adapters, and artwork/font packages with separate provenance. Those are not copied into this public repository. The included Godot client is self-contained and uses only native controls, while preserving the actual HTTP send/receive architecture.
 
 ### Run locally
 
@@ -168,6 +174,26 @@ python src/mirror_agent.py --id demo-persona --interlocutor self
 ```bash
 python -m unittest discover -s tests -v
 ```
+
+### Run the Godot bridge
+
+Install the optional server dependencies and start Flask from the repository root:
+
+```bash
+pip install -r requirements-server.txt
+python -m server.app
+```
+
+Then open `godot/project.godot` in Godot 4.4 or newer and run the main scene. The client connects to `http://127.0.0.1:5000`, starts an adaptive interview, sends answers and mirror messages, and displays structured event reflections.
+
+The bridge also keeps the original prototype route names—`/next_question`, `/text_input`, `/simulate_event`, and `/reset_interview`—so the earlier EMO GYM GDScript can be migrated incrementally. Recording, TTS, and physical printing are intentionally reported as unavailable in the public build until explicit, credential-free adapters are configured.
+
+### Dependency files
+
+- `requirements.txt` contains the reusable AI and memory core.
+- `requirements-server.txt` extends it with Flask for Godot integration.
+
+No virtual environment, generated Godot cache, user memory, recording, or API key belongs in Git.
 
 ## Author
 
