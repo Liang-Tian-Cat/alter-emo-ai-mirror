@@ -1,0 +1,14 @@
+[
+  {
+    "id": "intro_name",
+    "question": "Hi! Before we begin, could you tell me your name?",
+    "duration": 10,
+    "objective": "Capture the participant's preferred name"
+  },
+  {
+    "id": "job_q1",
+    "question": "What’s a recent decision you struggled with, and what guided your choice?",
+    "duration": 5,
+    "objective": "Identify how the participant navigates internal conflict and external pressures when making decisions, including the values, constraints, and sources of influence they prioritize."
+  }
+]

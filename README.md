@@ -97,6 +97,43 @@ The strongest sense of continuity did not come from saving more text. It came fr
 
 Interactive research prototype and portfolio case study. The public demo uses curated public memory; it does not expose a visitor's conversation history to the portfolio owner.
 
+## Source code
+
+This repository includes the working Python core used by the prototype:
+
+- `src/mirror_agent.py` — command-line mirror chat and dual-channel retrieval
+- `src/interview_agent.py` — adaptive interview and memory extraction
+- `src/agent_io.py` — agent, session, and memory persistence helpers
+- `src/build_agent.py` — persona workspace creation
+- `examples/` — example interview and MBTI prompt pools
+
+Private interview sessions, embeddings, recordings, generated agent memories, and API credentials are intentionally excluded.
+
+### Run locally
+
+```bash
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt
+copy .env.example .env  # use `cp` on macOS/Linux
+python src/mirror_agent.py
+```
+
+Add your own `OPENAI_API_KEY` to `.env`. Runtime memory is written under `agents/`, which is ignored by Git.
+
+### List personas
+
+```bash
+python src/mirror_agent.py --list
+```
+
+### Start a named mirror session
+
+```bash
+python src/mirror_agent.py --id demo-persona --interlocutor self
+```
+
 ## Author
 
 Designed and developed by [Liang Tian](https://liang-tian.com).
