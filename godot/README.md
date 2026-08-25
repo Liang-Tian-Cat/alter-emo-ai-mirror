@@ -4,7 +4,7 @@ This is a clean Godot 4 client for the public Alter Emo bridge. It demonstrates 
 
 ## Run
 
-1. From the repository root, install `requirements-server.txt` and run `python -m server.app`.
+1. From the repository root, install `requirements.txt` and run `python -m server.app`.
 2. Open `godot/project.godot` in Godot 4.4 or newer.
 3. Run the project, start a mirror session, answer the interview, then send messages or reflect on an event.
 

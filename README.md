@@ -122,6 +122,12 @@ Private interview sessions, embeddings, recordings, generated agent memories, an
 
 The original exhibition folder also contains Godot import caches, local audio output, hardware-specific adapters, and artwork/font packages with separate provenance. Those are not copied into this public repository. The included Godot client is self-contained and uses only native controls, while preserving the actual HTTP send/receive architecture.
 
+### Prerequisites
+
+- Python 3.10 (the committed dependency lock was verified with this version)
+- Godot 4.4 or newer for the embodied client
+- An OpenAI API key for live interview and mirror generation
+
 ### Run locally
 
 ```bash
@@ -177,10 +183,10 @@ python -m unittest discover -s tests -v
 
 ### Run the Godot bridge
 
-Install the optional server dependencies and start Flask from the repository root:
+Install the complete dependency lock and start Flask from the repository root:
 
 ```bash
-pip install -r requirements-server.txt
+pip install -r requirements.txt
 python -m server.app
 ```
 
@@ -188,10 +194,11 @@ Then open `godot/project.godot` in Godot 4.4 or newer and run the main scene. Th
 
 The bridge also keeps the original prototype route names—`/next_question`, `/text_input`, `/simulate_event`, and `/reset_interview`—so the earlier EMO GYM GDScript can be migrated incrementally. Recording, TTS, and physical printing are intentionally reported as unavailable in the public build until explicit, credential-free adapters are configured.
 
-### Dependency files
+### Dependencies
 
-- `requirements.txt` contains the reusable AI and memory core.
-- `requirements-server.txt` extends it with Flask for Godot integration.
+`requirements.txt` is the single installation entry point. It explicitly lists the verified direct and transitive Python packages for both the AI/memory core and the Flask/Godot bridge, so a fresh environment does not depend on an undocumented global package.
+
+Godot is a standalone engine rather than a Python package, so install Godot 4.4 or newer separately. Recording, TTS, and physical printing are not active in the public build and therefore do not add unused hardware packages to the Python environment.
 
 No virtual environment, generated Godot cache, user memory, recording, or API key belongs in Git.
 
