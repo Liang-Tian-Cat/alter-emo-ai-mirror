@@ -55,7 +55,9 @@ def load_or_init_meta(meta_path: str, pseudonym: str) -> Dict[str, Any]:
     meta.setdefault("identity", {"pseudonym": pseudonym, "mbti": None})
     meta.setdefault("personality_seed", {})
     meta.setdefault("empathic_style", {
-        "tone": [], "logic": "", "values": [], "boundaries": "", "example_phrases": []
+        "tone": [], "logic": "", "values": [], "boundaries": "", "example_phrases": [],
+        "message_length": "", "sentence_rhythm": "", "reply_cadence": "",
+        "recurring_vocabulary": [], "attribution": ""
     })
     meta.setdefault("model_info", {})
     meta.setdefault("consent", {"status": True, "scope": "research-only"})

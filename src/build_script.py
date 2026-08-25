@@ -1,6 +1,11 @@
 import json
+from pathlib import Path
 
-def load_pool(path="mbti_pool.json"):
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def load_pool(path=None):
+    path = Path(path) if path else PROJECT_ROOT / "examples" / "mbti_pool.json"
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 

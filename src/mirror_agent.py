@@ -1,13 +1,14 @@
 # mirror_agent.py
 # Mirror Persona Chat: continue dialog with a person's "mirror" built from prior interviews.
-# - Reads empathic_style from meta/sessions; dual-channel retrieval (event+emotion).
+# - Reads empathic_style from meta/sessions; four-signal retrieval restores narrative context.
 # - interlocutor=="self": write user & mirror turns into memory_stream; else only mirror_sessions/.
 # - NEW:
 #   * Style prompt imitates speaking style (no example_phrases).
 #   * Yes/No detection → concise, no advice.
 #   * Context window: after picks, load local conversation window (mirror + interview).
+#   * Reflection plan + constrained behavior policy before final response generation.
 #   * Temp-cache for non-self sessions (no main memory pollution).
-#   * Question-aware retrieval: prompt nodes included only when query is a question (+tiny boost).
+#   * Question-aware retrieval: prompt nodes are included only when the query is a question.
 #   * Event embeddings for self: user_vec = prev_mirror + user; mirror_vec = user + reply.
 
 from __future__ import annotations
@@ -18,12 +19,9 @@ import json
 import time
 import uuid
 import argparse
-from pathlib import Path
 from typing import Any, Dict, List
 
 import numpy as np
-from dotenv import load_dotenv
-from openai import OpenAI
 
 # ---- Reuse your IO helpers (unchanged) ----
 from agent_io import (
@@ -34,37 +32,28 @@ from agent_io import (
     AGENT_DIR,  # noqa
     ensure_dirs,
 )
+from memory_retrieval import DEFAULT_WEIGHTS, score_candidate
+from response_policy import (
+    fallback_response_plan,
+    normalize_response_plan,
+    response_instruction,
+)
+from runtime_config import create_openai_client, load_settings
 
 # =========================
 # Environment & OpenAI Init
 # =========================
-def _load_env() -> Dict[str, str]:
-    env_path = Path(__file__).with_name(".env")
-    load_dotenv(dotenv_path=env_path, override=True)
-    return {
-        "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY", "").strip(),
-        "OPENAI_PROJECT": (os.getenv("OPENAI_PROJECT", "") or os.getenv("OPENAI_PROJECT_ID", "")).strip(),
-        "CHAT_MODEL": os.getenv("CHAT_MODEL", "gpt-4o").strip(),
-        "EMB_MODEL": os.getenv("EMB_MODEL", "text-embedding-3-small").strip(),
-    }
-
-cfg = _load_env()
-if not re.match(r"^sk-[A-Za-z0-9_\-]{20,}$", cfg["OPENAI_API_KEY"]):
-    raise RuntimeError("❌ OPENAI_API_KEY is missing or malformed.")
-
-client = (
-    OpenAI(api_key=cfg["OPENAI_API_KEY"], project=cfg["OPENAI_PROJECT"])
-    if cfg["OPENAI_PROJECT"]
-    else OpenAI(api_key=cfg["OPENAI_API_KEY"])
-)
+cfg = load_settings()
 MODEL_CHAT = cfg["CHAT_MODEL"]
 MODEL_EMB = cfg["EMB_MODEL"]
+client = None
 
-# quick health check
-try:
-    _ = client.models.list().data[0].id
-except Exception as e:
-    raise RuntimeError(f"OpenAI 鉴权/网络自检失败：{e}")
+
+def get_client():
+    global client
+    if client is None:
+        client = create_openai_client(cfg)
+    return client
 
 # =========================
 # Globals & Retrieval Params
@@ -72,12 +61,11 @@ except Exception as e:
 memory_cache: List[Dict[str, Any]] = []  # in-process extras (temp nodes etc.)
 
 TOP_K = 3
-REL_MIN_SCORE = 0.40
+REL_MIN_SCORE = 0.36
 REL_MIN_EVT   = 0.25
 DELTA_BAND    = 0.10
 
-W_EVT = 0.80
-W_EMO = 0.20
+RETRIEVAL_WEIGHTS = DEFAULT_WEIGHTS
 
 # 默认上下文窗口（前后各 win 条），可用 CLI --ctxwin 覆盖
 WIN_CTX_DEFAULT = 2
@@ -94,7 +82,7 @@ def call_gpt(
     temperature: float = 0.3,
     json_only: bool = False
 ) -> str:
-    return client.chat.completions.create(
+    return get_client().chat.completions.create(
         model=MODEL_CHAT,
         messages=[{"role": "system", "content": sys}, {"role": "user", "content": prompt}],
         temperature=temperature,
@@ -102,7 +90,7 @@ def call_gpt(
     ).choices[0].message.content.strip()
 
 def get_embedding(text: str) -> List[float]:
-    return client.embeddings.create(model=MODEL_EMB, input=text).data[0].embedding
+    return get_client().embeddings.create(model=MODEL_EMB, input=text).data[0].embedding
 
 def cosine(a: List[float], b: List[float]) -> float:
     if not isinstance(a, list) or not isinstance(b, list) or not a or not b:
@@ -288,8 +276,6 @@ def search_similar_nodes_dual_robust(
     embed_fn,
     emo_tag_fn,
     cos_fn,
-    w_evt: float = W_EVT,
-    w_emo: float = W_EMO,
     top_k: int = 6,
 ) -> List[Dict[str, Any]]:
     evt_q = embed_fn(query_text)
@@ -336,13 +322,23 @@ def search_similar_nodes_dual_robust(
         else:
             s_emo = s_emo_raw
 
-        score = w_evt * s_evt + w_emo * s_emo
-
-        # 查询是问句 + 命中问句节点 → 微加分
-        if query_is_q and n.get("mtype") in PROMPT_MTYPES:
-            score += 0.05
-
-        scored.append({**n, "score": float(score), "_s_evt": float(s_evt), "_s_emo": float(s_emo)})
+        score_details = score_candidate(
+            semantic=s_evt,
+            emotion=s_emo,
+            importance=n.get("importance", 50),
+            timestamp=n.get("ts"),
+            weights=RETRIEVAL_WEIGHTS,
+        )
+        signals = score_details["signals"]
+        scored.append({
+            **n,
+            "score": float(score_details["score"]),
+            "_s_evt": float(signals["semantic"]),
+            "_s_emo": float(signals["emotion"]),
+            "_s_salience": float(signals["salience"]),
+            "_s_recency": float(signals["recency"]),
+            "_weighted": score_details["weighted"],
+        })
 
     scored.sort(key=lambda x: x["score"], reverse=True)
     return scored[:top_k]
@@ -353,7 +349,11 @@ def _print_adopted(use: List[Dict[str, Any]]):
     print("🔍 相似记忆（采用，按分数降序）：")
     for r in use:
         s = f"{r.get('score', 0.0):.2f}"
-        print(f"   · {r.get('summary','')}  (score={s} | s_evt={r.get('_s_evt',0):.2f}, s_emo={r.get('_s_emo',0):.2f})")
+        print(
+            f"   · {r.get('summary','')}  "
+            f"(score={s} | semantic={r.get('_s_evt',0):.2f}, emotion={r.get('_s_emo',0):.2f}, "
+            f"salience={r.get('_s_salience',0):.2f}, recency={r.get('_s_recency',0):.2f})"
+        )
 
 # =========================
 # Style loading & prompt
@@ -384,6 +384,11 @@ def _build_style_prompt(style: Dict[str, Any]) -> str:
     logic = style.get("logic", "") or ""
     values = ", ".join(style.get("values", [])[:3]) if isinstance(style.get("values"), list) else ""
     boundaries = style.get("boundaries", "") or ""
+    message_length = style.get("message_length", "") or ""
+    sentence_rhythm = style.get("sentence_rhythm", "") or ""
+    reply_cadence = style.get("reply_cadence", "") or ""
+    recurring_vocabulary = ", ".join(style.get("recurring_vocabulary", [])[:6]) if isinstance(style.get("recurring_vocabulary"), list) else ""
+    attribution = style.get("attribution", "") or ""
     return (
         "You are this person's MIRROR persona.\n"
         "Speak in their natural speaking style — imitate their habitual tone, rhythm, and phrasing inferred from past answers.\n"
@@ -393,11 +398,17 @@ def _build_style_prompt(style: Dict[str, Any]) -> str:
         f"- logic: {logic or '—'}\n"
         f"- values: {values or '—'}\n"
         f"- boundaries: {boundaries or '—'}\n\n"
+        f"- typical message length: {message_length or '—'}\n"
+        f"- sentence rhythm: {sentence_rhythm or '—'}\n"
+        f"- reply cadence: {reply_cadence or '—'}\n"
+        f"- recurring vocabulary: {recurring_vocabulary or '—'}\n"
+        f"- attribution pattern: {attribution or '—'}\n\n"
         "Hard rules:\n"
         "1) Stay consistent with this person's speaking manner (tone/rhythm/word choice).\n"
         "2) 1–3 short sentences; no generic advice unless explicitly asked.\n"
         "3) Only use retrieved memories/context; if unsure, ask one brief clarification.\n"
-        "4) Do not repeat the user's wording verbatim."
+        "4) Do not repeat the user's wording verbatim.\n"
+        "5) You are a transparent mirror, not the real person; never invent private memories, relationships, or certainty."
     )
 
 # =========================
@@ -477,12 +488,48 @@ def _strip_generic(s: str) -> str:
     t = s
     for p in GENERIC_BAN:
         t = t.replace(p, "")
-    return re.sub(r"\s{2,}", " ", t).strip(" ，。!？.")
+    return re.sub(r"\s{2,}", " ", t).strip(" ，")
 
 def _soft_deecho(reply: str, user_text: str) -> str:
     if len(user_text) >= 6 and user_text in reply:
         return reply.replace(user_text, "").strip()
     return reply
+
+
+def build_response_plan(user_text: str, memories: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Turn retrieved evidence into a constrained action before reply generation."""
+    retrieved_ids = [str(item.get("id") or item.get("node_id")) for item in memories if item.get("id") or item.get("node_id")]
+    fallback = fallback_response_plan(user_text, bool(retrieved_ids))
+    if not memories:
+        return fallback
+
+    evidence = [
+        {
+            "id": str(item.get("id") or item.get("node_id")),
+            "summary": item.get("summary", ""),
+            "emotion": (item.get("emotion_tag") or {}).get("emotion", "neutral"),
+            "score": round(float(item.get("score", 0.0)), 4),
+        }
+        for item in memories
+    ]
+    prompt = (
+        "Plan one grounded mirror response. Return only JSON with this schema:\n"
+        '{"reflection":"short evidence-based observation","action":"ask|reframe|nudge|mirror|pause",'
+        '"confidence":0.0,"grounding_ids":["retrieved-id"]}\n\n'
+        "Use only the supplied evidence. Choose ask when evidence is insufficient; never diagnose.\n"
+        f"User message: {user_text}\n"
+        f"Retrieved evidence: {json.dumps(evidence, ensure_ascii=False)}"
+    )
+    try:
+        raw = json.loads(call_gpt(
+            prompt,
+            sys="You are Alter Emo's reflection planner. Return one valid JSON object only.",
+            temperature=0.1,
+            json_only=True,
+        ))
+    except Exception:
+        raw = fallback
+    return normalize_response_plan(raw, user_text=user_text, retrieved_ids=retrieved_ids)
 
 # =========================
 # Mirror chat core
@@ -524,6 +571,8 @@ def mirror_reply(
             ctx_chunks.append(sumline)
     rel_txt = "\n\n---\n\n".join(ctx_chunks)
 
+    response_plan = build_response_plan(user_text, use)
+
     # ====== Generate reply ======
     yesno_mode = _is_yesno(user_text)
     extra_rule = (
@@ -534,6 +583,11 @@ def mirror_reply(
     prompt = (
         "Context memories (each with optional local context window):\n"
         f"{rel_txt or '(none)'}\n\n"
+        "Reflection plan:\n"
+        f"- observation: {response_plan['reflection']}\n"
+        f"- action: {response_plan['action']}\n"
+        f"- action instruction: {response_instruction(response_plan)}\n"
+        f"- grounded memory ids: {', '.join(response_plan['grounding_ids']) or '(none)'}\n\n"
         f"User said: {user_text}\n"
         f"{extra_rule}"
     )
@@ -652,9 +706,13 @@ def mirror_reply(
         "q": user_text,
         "picks": [
             {"id": (r.get("id") or r.get("node_id")), "summary": r.get("summary",""),
-             "score": r.get("score",0.0), "s_evt": r.get("_s_evt",0.0), "s_emo": r.get("_s_emo",0.0)}
+             "score": r.get("score",0.0), "semantic": r.get("_s_evt",0.0),
+             "emotion": r.get("_s_emo",0.0), "salience": r.get("_s_salience",0.0),
+             "recency": r.get("_s_recency",0.0), "weighted": r.get("_weighted", {})}
             for r in use
         ],
+        "response_plan": response_plan,
+        "retrieval_weights": RETRIEVAL_WEIGHTS,
         "win_ctx": win_ctx
     })
 
@@ -705,11 +763,20 @@ def main():
     parser.add_argument("--id", help="参与者代号，如 MIMI")
     parser.add_argument("--interlocutor", help="与镜像对话的人（如 self/妈妈/朋友A）")
     parser.add_argument("--list", action="store_true", help="仅列出已有的人格目录后退出")
+    parser.add_argument("--check", action="store_true", help="验证 OpenAI 配置与网络后退出")
     parser.add_argument("--ctxwin", type=int, default=WIN_CTX_DEFAULT, help="上下文窗口大小（前后各 N 条）")
     args = parser.parse_args()
 
     print("\n🪞 Mirror Persona Chat （输入 Q 回车可随时退出）")
     ensure_dirs()
+
+    if args.check:
+        try:
+            models = get_client().models.list().data
+            print(f"✅ OpenAI connection is ready ({len(models)} models visible).")
+        except Exception as error:
+            raise SystemExit(f"❌ OpenAI connection check failed: {error}")
+        return
 
     if args.list:
         names = _list_existing_agents()
@@ -776,8 +843,7 @@ def main():
         "REL_MIN_SCORE": REL_MIN_SCORE,
         "REL_MIN_EVT": REL_MIN_EVT,
         "DELTA_BAND": DELTA_BAND,
-        "W_EVT": W_EVT,
-        "W_EMO": W_EMO,
+        "RETRIEVAL_WEIGHTS": RETRIEVAL_WEIGHTS,
         "interlocutor": interlocutor,
         "started_at": time.time(),
         "WIN_CTX": int(args.ctxwin),

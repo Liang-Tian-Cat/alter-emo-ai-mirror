@@ -18,8 +18,6 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import numpy as np
-from dotenv import load_dotenv
-from openai import OpenAI
 
 from agent_io import (
     load_or_init_meta,
@@ -29,36 +27,22 @@ from agent_io import (
     AGENT_DIR,
     ensure_dirs,
 )
+from runtime_config import PROJECT_ROOT, create_openai_client, load_settings
 
 # =========================
 # Environment & OpenAI Init
 # =========================
-def _load_env() -> Dict[str, str]:
-    env_path = Path(__file__).with_name(".env")
-    load_dotenv(dotenv_path=env_path, override=True)
-    return {
-        "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY", "").strip(),
-        "OPENAI_PROJECT": (os.getenv("OPENAI_PROJECT", "") or os.getenv("OPENAI_PROJECT_ID", "")).strip(),
-        "CHAT_MODEL": os.getenv("CHAT_MODEL", "gpt-4o").strip(),
-        "EMB_MODEL": os.getenv("EMB_MODEL", "text-embedding-3-small").strip(),
-    }
-
-cfg = _load_env()
-if not re.match(r"^sk-[A-Za-z0-9_\-]{20,}$", cfg["OPENAI_API_KEY"]):
-    raise RuntimeError("❌ OPENAI_API_KEY is missing or malformed.")
-
-client = (
-    OpenAI(api_key=cfg["OPENAI_API_KEY"], project=cfg["OPENAI_PROJECT"])
-    if cfg["OPENAI_PROJECT"]
-    else OpenAI(api_key=cfg["OPENAI_API_KEY"])
-)
+cfg = load_settings()
 MODEL_CHAT = cfg["CHAT_MODEL"]
 MODEL_EMB = cfg["EMB_MODEL"]
+client = None
 
-try:
-    _ = client.models.list().data[0].id
-except Exception as e:
-    raise RuntimeError(f"OpenAI 鉴权/网络自检失败：{e}")
+
+def get_client():
+    global client
+    if client is None:
+        client = create_openai_client(cfg)
+    return client
 
 # =========================
 # Global Runtime State
@@ -98,7 +82,7 @@ def _retry(fn, *a, **kw):
 def call_gpt(prompt: str, sys: str = "You are a warm, concise Chinese interviewer.",
              temperature: float = 0.3, json_only: bool = False) -> str:
     return _retry(
-        lambda: client.chat.completions.create(
+        lambda: get_client().chat.completions.create(
             model=MODEL_CHAT,
             messages=[{"role": "system", "content": sys}, {"role": "user", "content": prompt}],
             temperature=temperature,
@@ -107,7 +91,7 @@ def call_gpt(prompt: str, sys: str = "You are a warm, concise Chinese interviewe
     )
 
 def get_embedding(text: str) -> List[float]:
-    return _retry(lambda: client.embeddings.create(model=MODEL_EMB, input=text).data[0].embedding)
+    return _retry(lambda: get_client().embeddings.create(model=MODEL_EMB, input=text).data[0].embedding)
 
 def cosine(a: List[float], b: List[float]) -> float:
     if not isinstance(a, list) or not isinstance(b, list) or not a or not b:
@@ -181,12 +165,13 @@ def _looks_template_like(obj: Dict[str, Any]) -> bool:
             toks.update([t for t in style.get("tone") if isinstance(t, str)])
         if isinstance(style.get("values"), list):
             toks.update([t for t in style.get("values") if isinstance(t, str)])
-        for k in ("logic", "boundaries"):
+        for k in ("logic", "boundaries", "message_length", "sentence_rhythm", "reply_cadence", "attribution"):
             v = style.get(k)
             if isinstance(v, str):
                 toks.add(v)
-        if isinstance(style.get("example_phrases"), list):
-            toks.update([t for t in style.get("example_phrases") if isinstance(t, str)])
+        for k in ("example_phrases", "recurring_vocabulary"):
+            if isinstance(style.get(k), list):
+                toks.update([t for t in style.get(k) if isinstance(t, str)])
         toks = {t.strip() for t in toks if isinstance(t, str)}
         return any(t in DEFAULT_BANNED_TOKENS for t in toks)
     except Exception:
@@ -203,6 +188,8 @@ def reflect_empathic_style(conversation: List[Dict[str, str]]) -> Dict[str, Any]
 - "logic" 用简短流程串（如 "倾听→澄清→建议"），禁止 "listen → reframe → support"。
 - "tone" ≤3 个词，避免 "calm"、"gentle"。
 - "values"/"boundaries" 无依据则为 null。
+- "message_length" 描述典型消息长度；"sentence_rhythm" 描述断句和节奏；"reply_cadence" 描述回应频率与展开方式。
+- "recurring_vocabulary" 只记录反复出现的词或短语；"attribution" 描述此人通常如何解释事件原因。无依据则为空。
 - "personality_seed" 为 Big5 推断，不确定可为 null。
 
 输出 JSON 结构（字段说明，不是示例）：
@@ -212,7 +199,12 @@ def reflect_empathic_style(conversation: List[Dict[str, str]]) -> Dict[str, Any]
     "logic": "",
     "values": [],
     "boundaries": "",
-    "example_phrases": []
+    "example_phrases": [],
+    "message_length": "",
+    "sentence_rhythm": "",
+    "reply_cadence": "",
+    "recurring_vocabulary": [],
+    "attribution": ""
   }},
   "personality_seed": {{"O": null, "C": null, "E": null, "A": null, "N": null}}
 }}
@@ -579,7 +571,7 @@ def build_random_script_from_mbti(mbti: str, pool: Dict[str, List[Dict[str, Any]
 # Pool Loader
 # =========================
 def load_pool(filename: str) -> Dict[str, Any]:
-    pool_path = Path(__file__).with_name(filename)
+    pool_path = PROJECT_ROOT / "examples" / filename
     if not pool_path.exists():
         raise FileNotFoundError(f"题库文件不存在：{pool_path}")
     try:
@@ -612,10 +604,6 @@ def main() -> None:
     pool = load_pool("mbti_pool.json")
 
     script = build_random_script_from_mbti(mbti, pool, n_mbti=2, n_gen=2)
-
-    os.makedirs("scripts", exist_ok=True)
-    with open("scripts/script_used.json", "w", encoding="utf-8") as f:
-        json.dump({"mbti": mbti, "script": script}, f, ensure_ascii=False, indent=2)
 
     print("\n🧠 Interview Starting...\n")
     for q in script:

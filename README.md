@@ -70,9 +70,13 @@ Candidate memories are ranked using four signals:
 
 After ranking, the system reopens the nearby narrative window rather than responding from an isolated memory summary.
 
+The public Python core implements these weights in `src/memory_retrieval.py`. Every selected memory is logged with its four raw signals and weighted contribution, so retrieval decisions can be inspected instead of hidden inside one opaque similarity score.
+
 ### 4. Reflection and behavior policy
 
 Retrieved evidence becomes a short reflection plan. A behavior policy then selects an interaction intent—ask, reframe, nudge, mirror, or pause—before the model writes the final response. This separates *what the agent should do* from *how the final sentence should sound*.
+
+The policy is constrained to retrieved memory IDs and has a deterministic local fallback. When grounded context is missing, the mirror asks rather than inventing a personal claim.
 
 ## Technology
 
@@ -101,11 +105,14 @@ Interactive research prototype and portfolio case study. The public demo uses cu
 
 This repository includes the working Python core used by the prototype:
 
-- `src/mirror_agent.py` — command-line mirror chat and dual-channel retrieval
+- `src/mirror_agent.py` — command-line mirror chat, narrative restoration, and response orchestration
 - `src/interview_agent.py` — adaptive interview and memory extraction
 - `src/agent_io.py` — agent, session, and memory persistence helpers
+- `src/memory_retrieval.py` — inspectable semantic, emotion, salience, and recency scoring
+- `src/response_policy.py` — constrained reflection/action planning and safe fallbacks
 - `src/build_agent.py` — persona workspace creation
 - `examples/` — example interview and MBTI prompt pools
+- `tests/` — offline unit tests for retrieval weights, grounding, and policy constraints
 
 Private interview sessions, embeddings, recordings, generated agent memories, and API credentials are intentionally excluded.
 
@@ -122,6 +129,28 @@ python src/mirror_agent.py
 
 Add your own `OPENAI_API_KEY` to `.env`. Runtime memory is written under `agents/`, which is ignored by Git.
 
+The command-line modules load `.env` from the repository root. They initialize the OpenAI client only when an API-backed operation starts, so local commands such as `--help` and `--list` work without a key.
+
+### Verify API configuration
+
+```bash
+python src/mirror_agent.py --check
+```
+
+### Run an adaptive interview
+
+```bash
+python src/interview_agent.py
+```
+
+The interview question pools are read from `examples/`; session artifacts remain under the ignored `agents/` directory.
+
+### Create an empty persona workspace
+
+```bash
+python src/build_agent.py --id demo-persona
+```
+
 ### List personas
 
 ```bash
@@ -132,6 +161,12 @@ python src/mirror_agent.py --list
 
 ```bash
 python src/mirror_agent.py --id demo-persona --interlocutor self
+```
+
+### Run the offline tests
+
+```bash
+python -m unittest discover -s tests -v
 ```
 
 ## Author
