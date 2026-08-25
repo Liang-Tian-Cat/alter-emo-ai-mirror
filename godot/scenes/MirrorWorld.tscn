@@ -1,0 +1,149 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://scripts/world_controller.gd" id="1_world"]
+[ext_resource type="Script" path="res://scripts/player_controller.gd" id="2_player"]
+[ext_resource type="Script" path="res://scripts/alter_emo_api.gd" id="3_api"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_player"]
+size = Vector2(20, 24)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_horizontal"]
+size = Vector2(420, 16)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_vertical"]
+size = Vector2(16, 480)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+bg_color = Color(0.067, 0.055, 0.102, 0.96)
+border_width_top = 2
+border_color = Color(0.62, 0.42, 0.86, 1)
+
+[node name="MirrorWorld" type="Node2D"]
+script = ExtResource("1_world")
+
+[node name="Ground" type="TileMapLayer" parent="."]
+z_index = -10
+
+[node name="NavigationRegion2D" type="NavigationRegion2D" parent="."]
+
+[node name="Targets" type="Node2D" parent="NavigationRegion2D"]
+
+[node name="Sofa" type="Marker2D" parent="NavigationRegion2D/Targets"]
+position = Vector2(72, 80)
+
+[node name="Eat" type="Marker2D" parent="NavigationRegion2D/Targets"]
+position = Vector2(344, 80)
+
+[node name="Cook" type="Marker2D" parent="NavigationRegion2D/Targets"]
+position = Vector2(72, 400)
+
+[node name="Study" type="Marker2D" parent="NavigationRegion2D/Targets"]
+position = Vector2(344, 400)
+
+[node name="Bounds" type="StaticBody2D" parent="."]
+
+[node name="Top" type="CollisionShape2D" parent="Bounds"]
+position = Vector2(210, 8)
+shape = SubResource("RectangleShape2D_horizontal")
+
+[node name="Bottom" type="CollisionShape2D" parent="Bounds"]
+position = Vector2(210, 472)
+shape = SubResource("RectangleShape2D_horizontal")
+
+[node name="Left" type="CollisionShape2D" parent="Bounds"]
+position = Vector2(8, 240)
+shape = SubResource("RectangleShape2D_vertical")
+
+[node name="Right" type="CollisionShape2D" parent="Bounds"]
+position = Vector2(408, 240)
+shape = SubResource("RectangleShape2D_vertical")
+
+[node name="Player" type="CharacterBody2D" parent="."]
+position = Vector2(208, 240)
+script = ExtResource("2_player")
+
+[node name="Body" type="Polygon2D" parent="Player"]
+polygon = PackedVector2Array(-12, -16, 12, -16, 14, 10, 0, 18, -14, 10)
+color = Color(0.82, 0.63, 0.98, 1)
+
+[node name="Face" type="Polygon2D" parent="Player"]
+polygon = PackedVector2Array(-7, -10, 7, -10, 7, 3, -7, 3)
+color = Color(0.96, 0.83, 0.72, 1)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Player"]
+shape = SubResource("RectangleShape2D_player")
+
+[node name="NavigationAgent2D" type="NavigationAgent2D" parent="Player"]
+path_desired_distance = 4.0
+target_desired_distance = 8.0
+avoidance_enabled = true
+radius = 12.0
+
+[node name="Api" type="Node" parent="."]
+script = ExtResource("3_api")
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="Panel" type="Panel" parent="UI"]
+offset_top = 480.0
+offset_right = 420.0
+offset_bottom = 720.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="Margin" type="MarginContainer" parent="UI/Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 12.0
+offset_right = -16.0
+offset_bottom = -12.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Column" type="VBoxContainer" parent="UI/Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="UI/Panel/Margin/Column"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.91, 0.78, 1, 1)
+theme_override_font_sizes/font_size = 20
+text = "EMBODIED MIRROR WORLD"
+
+[node name="BridgeStatus" type="Label" parent="UI/Panel/Margin/Column"]
+layout_mode = 2
+text = "Checking Flask bridge…"
+
+[node name="MovementStatus" type="Label" parent="UI/Panel/Margin/Column"]
+layout_mode = 2
+text = "Arrow keys: move · 1–4: navigate · auto patrol: on"
+
+[node name="Targets" type="HBoxContainer" parent="UI/Panel/Margin/Column"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Sofa" type="Button" parent="UI/Panel/Margin/Column/Targets"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "1 Sofa"
+
+[node name="Eat" type="Button" parent="UI/Panel/Margin/Column/Targets"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "2 Eat"
+
+[node name="Cook" type="Button" parent="UI/Panel/Margin/Column/Targets"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "3 Cook"
+
+[node name="Study" type="Button" parent="UI/Panel/Margin/Column/Targets"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "4 Study"
+
+[node name="Back" type="Button" parent="UI/Panel/Margin/Column"]
+layout_mode = 2
+text = "Back to AI mirror"

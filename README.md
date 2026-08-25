@@ -1,6 +1,6 @@
 # Alter Emo AI Mirror
 
-Alter Emo is a local Godot + Flask + Python prototype for building a conversational "AI mirror" from an adaptive interview and a persistent narrative-memory store.
+Alter Emo is a local Godot + Flask + Python prototype for building a conversational and embodied "AI mirror" from an adaptive interview and a persistent narrative-memory store.
 
 This repository contains the runnable public implementation: a Godot 4 client, an HTTP bridge, interview ingestion, memory retrieval, response planning, mirror chat, event reflection, and offline tests. Private memories, recordings, credentials, generated caches, and third-party exhibition assets are not included.
 
@@ -12,7 +12,7 @@ Verified on Windows with Python 3.10 and Godot 4.4:
 - all 27 locked Python packages installed and `pip check` passed;
 - 16 offline tests passed;
 - Flask started locally and returned HTTP 200 from `/health`;
-- the Godot project and main scene loaded and started with Godot 4.4;
+- the Godot project, HTTP interface, and TileMap/navigation world loaded with Godot 4.4;
 - Godot successfully reached the local Flask health endpoint.
 
 Live GPT generation requires a valid `OPENAI_API_KEY`. The repository can be installed and tested without a key, but interview ingestion, mirror replies, embeddings, and event reflection call the OpenAI API.
@@ -21,6 +21,9 @@ Live GPT generation requires a valid `OPENAI_API_KEY`. The repository can be ins
 
 ```text
 Godot 4 client
+    ├── interview and mirror UI
+    ├── TileMapLayer world + collision
+    ├── manual and autonomous navigation
     │ HTTP/JSON
     ▼
 Flask bridge (server/)
@@ -52,8 +55,9 @@ The default retrieval score uses four inspectable signals:
 alter-emo-ai-mirror/
 ├── godot/                  # Godot 4 client and main scene
 │   ├── project.godot
-│   ├── Main.tscn
-│   └── scripts/
+│   ├── Main.tscn             # Interview and mirror UI
+│   ├── scenes/MirrorWorld.tscn
+│   └── scripts/              # API, UI, world and player controllers
 ├── server/                 # Flask application and core adapter
 │   ├── app.py
 │   ├── bridge.py
@@ -207,6 +211,9 @@ Expected response:
 4. Enter a persona ID and select **Start mirror**.
 5. Answer the interview questions.
 6. After the interview reaches the `mirror` stage, use mirror chat or event reflection.
+7. Select **Open embodied mirror world** for the TileMap/navigation mode.
+
+In the embodied world, use the arrow keys for manual movement or keys `1`–`4` for target navigation. The character resumes autonomous patrol while idle. Touch-friendly destination buttons provide the same controls, and the status line confirms whether the Flask bridge is reachable.
 
 The Godot client connects to `http://127.0.0.1:5000` by default. To use a different bridge address, change `base_url` on the `Api` node in `Main.tscn`.
 

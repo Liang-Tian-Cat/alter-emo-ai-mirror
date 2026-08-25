@@ -10,6 +10,7 @@ extends Control
 @onready var event_input: LineEdit = $Margin/Column/EventRow/Event
 @onready var reflect_button: Button = $Margin/Column/EventRow/Reflect
 @onready var reset_button: Button = $Margin/Column/Reset
+@onready var world_button: Button = $Margin/Column/World
 
 var session_id := ""
 var stage := "interview"
@@ -20,6 +21,7 @@ func _ready() -> void:
 	send_button.pressed.connect(_send_message)
 	reflect_button.pressed.connect(_reflect_event)
 	reset_button.pressed.connect(_reset_session)
+	world_button.pressed.connect(_open_world)
 	message_input.gui_input.connect(_on_message_input)
 	api.health_received.connect(_on_health)
 	api.session_started.connect(_on_session_started)
@@ -28,6 +30,10 @@ func _ready() -> void:
 	api.session_reset.connect(_on_session_reset)
 	api.request_failed.connect(_on_request_failed)
 	api.check_health()
+
+
+func _open_world() -> void:
+	get_tree().change_scene_to_file("res://scenes/MirrorWorld.tscn")
 
 
 func _start_session() -> void:

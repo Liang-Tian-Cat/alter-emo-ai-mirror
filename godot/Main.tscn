@@ -113,3 +113,7 @@ text = "Reflect"
 layout_mode = 2
 disabled = true
 text = "Reset private session"
+
+[node name="World" type="Button" parent="Margin/Column"]
+layout_mode = 2
+text = "Open embodied mirror world"

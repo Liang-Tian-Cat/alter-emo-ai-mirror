@@ -11,7 +11,29 @@ class GodotContractTests(unittest.TestCase):
         api = (ROOT / "godot" / "scripts" / "alter_emo_api.gd").read_text(encoding="utf-8")
         self.assertIn('run/main_scene="res://Main.tscn"', project)
         self.assertIn("/v1/sessions", api)
-        self.assertNotIn("sk-", api)
+        scripts = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in (ROOT / "godot" / "scripts").glob("*.gd")
+        )
+        self.assertNotIn("sk-", scripts)
+
+    def test_embodied_world_has_tilemap_navigation_and_bridge(self):
+        scene = (ROOT / "godot" / "scenes" / "MirrorWorld.tscn").read_text(encoding="utf-8")
+        world = (ROOT / "godot" / "scripts" / "world_controller.gd").read_text(encoding="utf-8")
+        player = (ROOT / "godot" / "scripts" / "player_controller.gd").read_text(encoding="utf-8")
+        main_scene = (ROOT / "godot" / "Main.tscn").read_text(encoding="utf-8")
+        main_script = (ROOT / "godot" / "scripts" / "main.gd").read_text(encoding="utf-8")
+
+        self.assertIn('type="TileMapLayer"', scene)
+        self.assertIn('type="NavigationRegion2D"', scene)
+        self.assertIn('type="NavigationAgent2D"', scene)
+        self.assertIn('path="res://scripts/alter_emo_api.gd"', scene)
+        self.assertIn("TileSetAtlasSource.new()", world)
+        self.assertIn("api.check_health()", world)
+        self.assertIn('Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")', player)
+        self.assertIn("autonomous_patrol", player)
+        self.assertIn('name="World"', main_scene)
+        self.assertIn('res://scenes/MirrorWorld.tscn', main_script)
 
 
 if __name__ == "__main__":
