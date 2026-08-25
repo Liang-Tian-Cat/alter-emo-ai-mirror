@@ -1,26 +1,30 @@
 # Alter Emo AI Mirror
 
-Alter Emo is a local Flask + Python prototype for building a conversational "AI mirror" from an adaptive interview and a persistent narrative-memory store.
+Alter Emo is a local Godot + Flask + Python prototype for building a conversational and embodied "AI mirror" from an adaptive interview and a persistent narrative-memory store.
 
-This repository contains the runnable public implementation: an HTTP bridge, interview ingestion, memory retrieval, response planning, mirror chat, event reflection, and offline tests. Private memories, recordings, credentials, generated caches, and third-party exhibition assets are not included.
+This repository contains the runnable public implementation: a Godot 4 client, an HTTP bridge, interview ingestion, memory retrieval, response planning, mirror chat, event reflection, and offline tests. Private memories, recordings, credentials, generated caches, and third-party exhibition assets are not included.
 
 ## Current status
 
-Verified on Windows with Python 3.10:
+Verified on Windows with Python 3.10 and Godot 4.4:
 
 - clean virtual-environment installation from `requirements.txt`;
 - all 27 locked Python packages installed and `pip check` passed;
 - 16 offline tests passed;
 - Flask started locally and returned HTTP 200 from `/health`;
-- Flask started locally and returned the expected session and health responses.
+- the Godot project, HTTP interface, and TileMap/navigation world loaded with Godot 4.4;
+- Godot successfully reached the local Flask health endpoint.
 
 Live GPT generation requires a valid `OPENAI_API_KEY`. The repository can be installed and tested without a key, but interview ingestion, mirror replies, embeddings, and event reflection call the OpenAI API.
 
 ## Architecture
 
 ```text
-CLI or HTTP client
-    │ JSON
+Godot 4 client
+    ├── interview and mirror UI
+    ├── TileMapLayer world + collision
+    ├── manual and autonomous navigation
+    │ HTTP/JSON
     ▼
 Flask bridge (server/)
     ├── session and interview state
@@ -49,7 +53,12 @@ The default retrieval score uses four inspectable signals:
 
 ```text
 alter-emo-ai-mirror/
-├── legacy/emo-gym-godot/   # Sanitized original EMO GYM source snapshot (reference only)
+├── godot/                  # Godot 4 client and main scene
+│   ├── project.godot
+│   ├── Main.tscn             # Interview and mirror UI
+│   ├── scenes/MirrorWorld.tscn
+│   └── scripts/              # API, UI, world and player controllers
+├── legacy/emo-gym-godot/   # Sanitized original EMO GYM control-source snapshot
 ├── server/                 # Flask application and core adapter
 │   ├── app.py
 │   ├── bridge.py
@@ -72,9 +81,10 @@ The following runtime directories are generated locally and ignored by Git:
 
 - Windows, macOS, or Linux;
 - Python 3.10 (the committed lock file was verified with Python 3.10);
+- Godot 4.4 or newer for the graphical client;
 - a valid OpenAI API key for live AI operations.
 
-`requirements.txt` explicitly pins both direct and transitive Python packages.
+`requirements.txt` explicitly pins both direct and transitive Python packages. Godot is a standalone application and is therefore installed separately, not through `pip`.
 
 ## Installation
 
@@ -149,7 +159,9 @@ ALTER_EMO_PERSONA_ID=demo-persona
 
 Never commit `.env` or paste a real API key into Python, GDScript, screenshots, or Git history.
 
-## Run the HTTP bridge
+## Run the Godot application
+
+### 1. Start the Flask bridge
 
 From the repository root, with the virtual environment active:
 
@@ -192,9 +204,23 @@ Expected response:
 }
 ```
 
+### 2. Start Godot
+
+1. Open Godot 4.4 or newer.
+2. Import `godot/project.godot`.
+3. Run the project with **F5**.
+4. Enter a persona ID and select **Start mirror**.
+5. Answer the interview questions.
+6. After the interview reaches the `mirror` stage, use mirror chat or event reflection.
+7. Select **Open embodied mirror world** for the TileMap/navigation mode.
+
+In the embodied world, use the arrow keys for manual movement or keys `1`–`4` for target navigation. The character resumes autonomous patrol while idle. Touch-friendly destination buttons provide the same controls, and the status line confirms whether the Flask bridge is reachable.
+
+The Godot client connects to `http://127.0.0.1:5000` by default. To use a different bridge address, change `base_url` on the `Api` node in `Main.tscn`.
+
 ## Command-line usage
 
-The Python core can run without the HTTP bridge.
+The Python core can also run without Godot.
 
 Check API credentials and network access:
 
@@ -299,7 +325,7 @@ The suite covers:
 - modern Flask API workflow;
 - original EMO GYM compatibility routes;
 - failed-ingestion retry behavior;
-- sanitized legacy source-snapshot and embedded-key checks.
+- Godot project/API contract and embedded-key checks.
 
 Tests use a fake core adapter for HTTP workflow tests, so the test suite does not spend API credits and does not require an OpenAI key.
 
@@ -321,6 +347,13 @@ Bridge state is stored under `runtime/bridge_sessions/`. Deleting a session thro
 ### `401` or `invalid_api_key`
 
 Replace `OPENAI_API_KEY` in `.env` with a currently valid key, then restart Flask. Do not reuse or commit an exposed key.
+
+### Godot reports a bridge connection error
+
+- confirm `python -m server.app` is still running;
+- open `http://127.0.0.1:5000/health`;
+- confirm the Godot `Api.base_url` matches `ALTER_EMO_HOST` and `ALTER_EMO_PORT`;
+- check that another program is not using port 5000.
 
 ### Flask returns `502`
 

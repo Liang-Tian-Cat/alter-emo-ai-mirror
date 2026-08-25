@@ -1,0 +1,119 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="Script" path="res://scripts/alter_emo_api.gd" id="2_api"]
+
+[node name="Main" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_main")
+
+[node name="Api" type="Node" parent="."]
+script = ExtResource("2_api")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.055, 0.047, 0.078, 1)
+mouse_filter = 2
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = -24.0
+offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Column" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="Margin/Column"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.945, 0.82, 1, 1)
+theme_override_font_sizes/font_size = 28
+text = "ALTER EMO"
+
+[node name="Subtitle" type="Label" parent="Margin/Column"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.72, 0.69, 0.78, 1)
+text = "Godot ↔ Flask ↔ narrative-memory agent"
+
+[node name="PersonaRow" type="HBoxContainer" parent="Margin/Column"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Persona" type="LineEdit" parent="Margin/Column/PersonaRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Persona ID"
+text = "demo-persona"
+
+[node name="Start" type="Button" parent="Margin/Column/PersonaRow"]
+layout_mode = 2
+text = "Start mirror"
+
+[node name="Status" type="Label" parent="Margin/Column"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.49, 0.9, 0.73, 1)
+text = "Checking local bridge…"
+
+[node name="Transcript" type="RichTextLabel" parent="Margin/Column"]
+custom_minimum_size = Vector2(0, 280)
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = true
+fit_content = false
+scroll_active = true
+text = "[color=#b8afc7]Start a session to begin the adaptive interview.[/color]"
+
+[node name="Message" type="TextEdit" parent="Margin/Column"]
+custom_minimum_size = Vector2(0, 82)
+layout_mode = 2
+placeholder_text = "Write an interview answer or message to your mirror…"
+wrap_mode = 1
+
+[node name="Send" type="Button" parent="Margin/Column"]
+layout_mode = 2
+disabled = true
+text = "Send"
+
+[node name="EventLabel" type="Label" parent="Margin/Column"]
+layout_mode = 2
+text = "Reflect on an event"
+
+[node name="EventRow" type="HBoxContainer" parent="Margin/Column"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Event" type="LineEdit" parent="Margin/Column/EventRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Something that happened today…"
+
+[node name="Reflect" type="Button" parent="Margin/Column/EventRow"]
+layout_mode = 2
+disabled = true
+text = "Reflect"
+
+[node name="Reset" type="Button" parent="Margin/Column"]
+layout_mode = 2
+disabled = true
+text = "Reset private session"
+
+[node name="World" type="Button" parent="Margin/Column"]
+layout_mode = 2
+text = "Open embodied mirror world"
