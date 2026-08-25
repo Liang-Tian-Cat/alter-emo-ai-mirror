@@ -2,6 +2,8 @@
 
 A local AI mirror built with Godot 4, Flask, and Python. It learns from consented interviews and daily narratives, retrieves relevant memories, and generates grounded reflections in the user's communication style.
 
+[View the project on liang-tian.com](https://liang-tian.com/works/aimirror)
+
 ## Features
 
 - Adaptive interview and follow-up questions
