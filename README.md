@@ -69,14 +69,6 @@ In the application:
 
 The privacy screen can inspect, revise, delete, pause, revoke, or export stored memory.
 
-## Verification
-
-```bash
-python -m unittest discover -s verification -p "*_checks.py" -v
-```
-
-The verification suite runs without an API key.
-
 ## Local data
 
 Generated memories, sessions, recordings, credentials, and Godot cache files are ignored by Git. Model-backed operations send submitted content to the configured model provider.
