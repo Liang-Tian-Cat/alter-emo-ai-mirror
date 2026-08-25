@@ -194,13 +194,13 @@ The original `/next_question`, `/text_input`, `/simulate_event`, and `/reset_int
 
 ## Verification
 
-Run all offline tests without an API key:
+Run all offline verification checks without an API key:
 
 ```bash
-python -m unittest discover -s tests -v
+python -m unittest discover -s verification -p "*_checks.py" -v
 ```
 
-The suite verifies retrieval weights, the five-factor salience gate, memory controls and ZIP export, narrative compression, response-policy constraints, consent, adaptive follow-ups, rollback, audio contracts, visitor isolation, runtime paths, and Godot scene/API contracts.
+The verification suite covers retrieval weights, the five-factor salience gate, memory controls and ZIP export, narrative compression, response-policy constraints, consent, adaptive follow-ups, rollback, audio contracts, visitor isolation, runtime paths, and Godot scene/API contracts.
 
 For live verification, configure `.env`, start Flask, complete one Godot interview, create a daily narrative, inspect it from the privacy screen, record a voice turn, and export the persona ZIP.
 
